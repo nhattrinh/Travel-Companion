@@ -1,0 +1,54 @@
+# Docker Compose configuration for production environment
+
+version: '3.8'
+
+services:
+  menu-translation-backend:
+    build:
+      target: runtime
+      args:
+        ENVIRONMENT: production
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=WARNING
+      - WORKERS=4
+    volumes:
+      # Production volumes (no source code mounting)
+      - app_logs:/app/logs
+      - app_temp:/app/temp
+      - app_models:/app/models
+      - ./.env.production:/app/.env.production:ro
+    command: ["python", "run.py", "--env", "production"]
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  nginx:
+    # Enable nginx for production
+    profiles: []
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
