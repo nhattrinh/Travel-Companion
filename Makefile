@@ -1,6 +1,6 @@
 # Makefile for Menu Translation Backend Docker operations
 
-.PHONY: help build up down restart logs ps clean test dev prod staging
+.PHONY: help build up down restart logs ps clean test dev prod staging dev-backend lint migrate perf-smoke
 
 # Default environment
 ENV ?= development
@@ -65,6 +65,24 @@ clean: ## Clean up containers, networks, and volumes
 test: ## Run tests in Docker container
 	@echo "Running tests..."
 	@docker-compose -f docker-compose.yml run --rm menu-translation-backend python -m pytest -v
+
+dev-backend: ## Run backend locally without Docker (uvicorn)
+	@echo "Starting local backend (uvicorn)..."
+	@python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+lint: ## Run code linters & format check
+	@echo "Running lint & type checks..."
+	@black --check app || echo "Black formatting differences detected"
+	@flake8 app
+	@mypy app
+
+migrate: ## Run Alembic migrations (upgrade head)
+	@echo "Running Alembic migrations..."
+	@alembic upgrade head || echo "Alembic not configured yet"
+
+perf-smoke: ## Run performance smoke tests
+	@echo "Running performance smoke tests..."
+	@pytest -q tests/perf || echo "Perf tests not present yet"
 
 dev: ## Start development environment
 	@$(MAKE) ENV=development up

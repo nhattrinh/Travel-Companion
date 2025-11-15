@@ -31,7 +31,15 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+The following MUST be affirmed (link to PR or doc for evidence):
+
+1. Code Quality Discipline: Tests outlined for new logic; lint/format tools configured; error handling strategy defined; no planned dead code.
+2. User Experience Consistency: API response envelope confirmed; naming stability plan documented; translation fallback behavior defined if applicable.
+3. Performance & Efficiency Standards: Target p95/p99 latency, resource bounds, and profiling plan recorded; caching/invalidation approach drafted.
+4. Security & Reliability Constraints: Secret management path (env/ vault) identified; validation approach for external inputs; health check scope listed.
+5. Workflow & Quality Gates: CI stages enumerated (lint, tests, coverage, perf smoke); reviewer role assignment clarified.
+
+Any waiver (temporary non-compliance) MUST include scope, duration (<30 days), and mitigation reference.
 
 ## Project Structure
 

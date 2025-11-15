@@ -89,11 +89,14 @@
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
+- **FR-006**: All API responses MUST follow envelope `{status,data,error}` (or documented variant) for UX consistency.
+- **FR-007**: Field names exposed via API MUST remain stable; changes REQUIRE deprecation path with dual-field window.
+- **FR-008**: System MUST expose health and performance metrics (latency p95/p99, queue depth, memory) for monitoring.
 
 *Example of marking unclear requirements:*
 
-- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
-- **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+- **FR-009**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
+- **FR-010**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
 ### Key Entities *(include if feature involves data)*
 
@@ -109,7 +112,8 @@
 
 ### Measurable Outcomes
 
-- **SC-001**: [Measurable metric, e.g., "Users can complete account creation in under 2 minutes"]
-- **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
-- **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
-- **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
+- **SC-001**: [Primary UX success metric, e.g., "90% of menu translations complete without manual correction"]
+- **SC-002**: [Performance: p95 latency ≤200ms for POST /process-menu under nominal load definition]
+- **SC-003**: [Scalability: System handles 1000 concurrent requests with p99 ≤500ms]
+- **SC-004**: [Reliability: Error rate <1% for valid requests over 24h]
+- **SC-005**: [Resource Efficiency: Average memory per worker ≤ X MB at target throughput]

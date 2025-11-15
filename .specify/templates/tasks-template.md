@@ -151,11 +151,44 @@ Examples of foundational tasks (adjust based on your project):
 **Purpose**: Improvements that affect multiple user stories
 
 - [ ] TXXX [P] Documentation updates in docs/
-- [ ] TXXX Code cleanup and refactoring
-- [ ] TXXX Performance optimization across all stories
+- [ ] TXXX Code cleanup and refactoring (remove dead code, ensure docstrings)
+- [ ] TXXX Performance optimization across all stories (profile & remediate p95/p99 outliers)
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
-- [ ] TXXX Security hardening
+- [ ] TXXX Security hardening (validate inputs, secret scan)
 - [ ] TXXX Run quickstart.md validation
+
+---
+
+## Principle Alignment Tasks (Mandatory Gates Before Release)
+
+### Code Quality Discipline
+- [ ] QUAL001 Ensure >80% coverage in newly added modules (list modules)
+- [ ] QUAL002 Lint & format pass with zero unresolved warnings
+- [ ] QUAL003 Remove unused imports / dead code from touched files
+- [ ] QUAL004 Verify structured error handling (no raw trace leaks)
+
+### User Experience Consistency
+- [ ] UX001 Confirm all endpoints return standard envelope `{status,data,error}`
+- [ ] UX002 Validate field naming stability (list any deprecated fields)
+- [ ] UX003 Document translation fallback behavior
+- [ ] UX004 Review logs/messages for actionable wording (no internal jargon)
+
+### Performance & Efficiency
+- [ ] PERF001 Capture baseline latency & resource metrics pre-change
+- [ ] PERF002 Profile new heavy operations (attach summary)
+- [ ] PERF003 Verify p95 latency targets met for critical endpoints
+- [ ] PERF004 Audit caching TTLs & invalidation strategies
+
+### Security & Reliability
+- [ ] SEC001 Confirm no secrets committed (scan results)
+- [ ] SEC002 Validate input sanitation rules implemented
+- [ ] SEC003 Health checks cover dependencies & queue depths
+- [ ] SEC004 List pending security patch dependencies (if any)
+
+### Workflow & Quality Gates
+- [ ] FLOW001 CI stages passing (lint/tests/coverage/perf smoke)
+- [ ] FLOW002 Reviewer sign-off includes principle checklist confirmation
+- [ ] FLOW003 Waivers (if any) documented with expiry
 
 ---
 

@@ -146,15 +146,48 @@ def create_app() -> FastAPI:
         
         return response
     
+    # Add metrics collection middleware
+    @app.middleware("http")
+    async def metrics_middleware(request: Request, call_next):
+        """Collect metrics for observability."""
+        from app.api.metrics_endpoints import metrics_collector
+        
+        # Skip metrics collection for metrics endpoint itself
+        if request.url.path == "/metrics":
+            return await call_next(request)
+        
+        start_time = time.time()
+        response = await call_next(request)
+        latency = time.time() - start_time
+        
+        # Record request metrics
+        endpoint = f"{request.method} {request.url.path}"
+        is_error = response.status_code >= 400
+        metrics_collector.record_request(endpoint, latency, is_error)
+        
+        return response
+    
 
     
     # Include API routers
     from app.api.menu_endpoints import router as menu_router
     from app.api.health_endpoints import router as health_router
     from app.api.batch_endpoints import router as batch_router
+    from app.api.auth_endpoints import router as auth_router
+    from app.api.translation_endpoints import router as translation_router
+    from app.api.navigation_endpoints import router as navigation_router
+    from app.api.phrasebook_endpoints import router as phrasebook_router
+    from app.api.trips_endpoints import router as trips_router
+    from app.api.metrics_endpoints import router as metrics_router
     app.include_router(menu_router)
     app.include_router(health_router)
     app.include_router(batch_router)
+    app.include_router(auth_router)
+    app.include_router(translation_router)
+    app.include_router(navigation_router)
+    app.include_router(phrasebook_router)
+    app.include_router(trips_router)
+    app.include_router(metrics_router)
     
     return app
 
@@ -177,6 +210,16 @@ async def root():
 async def health_check():
     """Health check endpoint with comprehensive system status."""
     from app.core.error_handlers import error_handler
+    from app.core.db import get_db
+    from app.core.cache_client import CacheClient
+    from sqlalchemy import text
+    
+    health_details = {
+        "database": {"status": "unknown"},
+        "cache": {"status": "unknown"},
+        "models": {},
+        "system": {}
+    }
     
     # Get service container
     service_container = getattr(app.state, 'service_container', None)
@@ -186,34 +229,85 @@ async def health_check():
             "status": "unhealthy",
             "message": "Service container not initialized",
             "version": settings.app_version,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "details": health_details
         }
     
     try:
+        # Check database connection
+        try:
+            async for db in get_db():
+                result = await db.execute(text("SELECT 1"))
+                health_details["database"] = {
+                    "status": "healthy",
+                    "connection": "ok"
+                }
+                break
+        except Exception as e:
+            logger.error(f"Database health check failed: {e}")
+            health_details["database"] = {
+                "status": "unhealthy",
+                "error": str(e)
+            }
+        
+        # Check Redis cache connection
+        try:
+            cache_client = CacheClient()
+            if cache_client.enabled:
+                await cache_client.set("health_check", "ok", ttl_seconds=10)
+                result = await cache_client.get("health_check")
+                health_details["cache"] = {
+                    "status": "healthy" if result == "ok" else "degraded",
+                    "connection": "ok" if result == "ok" else "failed"
+                }
+            else:
+                health_details["cache"] = {
+                    "status": "disabled",
+                    "message": "Redis not configured"
+                }
+        except Exception as e:
+            logger.error(f"Cache health check failed: {e}")
+            health_details["cache"] = {
+                "status": "degraded",
+                "error": str(e),
+                "message": "Cache unavailable but gracefully degraded"
+            }
+        
         # Get comprehensive system status from lifecycle manager
         lifecycle_manager = service_container.get_lifecycle_manager()
-        system_status = lifecycle_manager.get_system_status()
+        health_details["system"] = lifecycle_manager.get_system_status()
         
         # Get model manager status
         model_manager = service_container.get_model_manager()
-        models_status = {}
         
         for model_type in model_manager._models:
             model = model_manager._models[model_type]
             if model:
                 try:
-                    models_status[model_type.value] = await model.health_check()
-                except Exception:
-                    models_status[model_type.value] = False
+                    health_details["models"][model_type.value] = {
+                        "status": "healthy" if await model.health_check() else "unhealthy"
+                    }
+                except Exception as e:
+                    health_details["models"][model_type.value] = {
+                        "status": "unhealthy",
+                        "error": str(e)
+                    }
             else:
-                models_status[model_type.value] = False
+                health_details["models"][model_type.value] = {
+                    "status": "not_loaded"
+                }
         
         # Determine overall status
-        if not models_status:
-            overall_status = "healthy"  # No models registered yet
-        elif all(models_status.values()):
+        db_healthy = health_details["database"]["status"] == "healthy"
+        cache_ok = health_details["cache"]["status"] in ["healthy", "disabled", "degraded"]
+        models_healthy = all(
+            m.get("status") in ["healthy", "not_loaded"] 
+            for m in health_details["models"].values()
+        ) if health_details["models"] else True
+        
+        if db_healthy and cache_ok and models_healthy:
             overall_status = "healthy"
-        elif any(models_status.values()):
+        elif db_healthy:
             overall_status = "degraded"
         else:
             overall_status = "unhealthy"
@@ -223,11 +317,10 @@ async def health_check():
         
         return {
             "status": overall_status,
-            "models_status": models_status,
-            "system_status": system_status,
             "version": settings.app_version,
-            "error_statistics": error_stats,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "details": health_details,
+            "error_statistics": error_stats
         }
         
     except Exception as e:
@@ -236,5 +329,6 @@ async def health_check():
             "status": "unhealthy",
             "message": f"Health check failed: {str(e)}",
             "version": settings.app_version,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "details": health_details
         }
