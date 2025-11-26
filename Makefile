@@ -1,153 +1,63 @@
-# Makefile for Menu Translation Backend Docker operations
+# Makefile for Menu Translation Backend - Local Development
 
-.PHONY: help build up down restart logs ps clean test dev prod staging
-
-# Default environment
-ENV ?= development
-
-# Docker compose files
-COMPOSE_DEV = docker-compose.yml
-COMPOSE_STAGING = docker-compose.yml -f docker-compose.staging.yml
-COMPOSE_PROD = docker-compose.yml -f docker-compose.production.yml
-
-# Set compose command based on environment
-ifeq ($(ENV),staging)
-    COMPOSE_CMD = docker-compose -f $(COMPOSE_STAGING)
-else ifeq ($(ENV),production)
-    COMPOSE_CMD = docker-compose -f $(COMPOSE_PROD)
-else
-    COMPOSE_CMD = docker-compose -f $(COMPOSE_DEV)
-endif
+.PHONY: help build up down restart logs ps clean test shell redis-cli health stats
 
 help: ## Show this help message
-	@echo "Menu Translation Backend - Docker Operations"
+	@echo "Menu Translation Backend - Local Development"
 	@echo ""
-	@echo "Usage: make [target] [ENV=environment]"
-	@echo ""
-	@echo "Environments:"
-	@echo "  development (default) - Development environment with hot reload"
-	@echo "  staging              - Staging environment"
-	@echo "  production           - Production environment with Nginx"
+	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
 build: ## Build Docker images
-	@echo "Building images for $(ENV) environment..."
-	@ENVIRONMENT=$(ENV) $(COMPOSE_CMD) build
+	@echo "Building development images..."
+	@docker-compose build
 
 up: ## Start services
-	@echo "Starting services for $(ENV) environment..."
-	@ENVIRONMENT=$(ENV) $(COMPOSE_CMD) up -d
+	@echo "Starting services..."
+	@docker-compose up -d
 	@echo "Services started. Checking health..."
-	@sleep 10
-	@$(COMPOSE_CMD) ps
+	@sleep 5
+	@docker-compose ps
 
 down: ## Stop and remove services
-	@echo "Stopping services for $(ENV) environment..."
-	@$(COMPOSE_CMD) down
+	@echo "Stopping services..."
+	@docker-compose down
 
 restart: ## Restart services
-	@echo "Restarting services for $(ENV) environment..."
-	@$(COMPOSE_CMD) restart
+	@echo "Restarting services..."
+	@docker-compose restart
 
-logs: ## Show service logs
-	@$(COMPOSE_CMD) logs -f
+logs: ## Show service logs (follow mode)
+	@docker-compose logs -f
 
 ps: ## Show service status
-	@$(COMPOSE_CMD) ps
+	@docker-compose ps
 
 clean: ## Clean up containers, networks, and volumes
 	@echo "Cleaning up Docker resources..."
-	@$(COMPOSE_CMD) down -v --remove-orphans
+	@docker-compose down -v --remove-orphans
 	@docker system prune -f
 
 test: ## Run tests in Docker container
 	@echo "Running tests..."
-	@docker-compose -f docker-compose.yml run --rm menu-translation-backend python -m pytest -v
+	@docker-compose run --rm menu-translation-backend python -m pytest -v
 
-dev: ## Start development environment
-	@$(MAKE) ENV=development up
-
-staging: ## Start staging environment
-	@$(MAKE) ENV=staging up
-
-prod: ## Start production environment
-	@$(MAKE) ENV=production up
-
-# Development specific targets
-dev-build: ## Build development image
-	@$(MAKE) ENV=development build
-
-dev-logs: ## Show development logs
-	@$(MAKE) ENV=development logs
-
-dev-shell: ## Access development container shell
+shell: ## Access application container shell
 	@docker-compose exec menu-translation-backend bash
 
-dev-redis: ## Access Redis CLI in development
+redis-cli: ## Access Redis CLI
 	@docker-compose exec redis redis-cli
 
-# Production specific targets
-prod-build: ## Build production image
-	@$(MAKE) ENV=production build
-
-prod-deploy: ## Deploy to production (build + up)
-	@$(MAKE) ENV=production build
-	@$(MAKE) ENV=production up
-
-prod-logs: ## Show production logs
-	@$(MAKE) ENV=production logs
-
-# Utility targets
 health: ## Check service health
 	@echo "Checking service health..."
 	@curl -f http://localhost:8000/health || echo "Service not responding"
 
-backup-redis: ## Backup Redis data
-	@echo "Backing up Redis data..."
-	@docker run --rm -v menu-translation_redis_data:/data -v $(PWD):/backup alpine tar czf /backup/redis-backup-$(shell date +%Y%m%d-%H%M%S).tar.gz -C /data .
-	@echo "Backup completed: redis-backup-$(shell date +%Y%m%d-%H%M%S).tar.gz"
-
-restore-redis: ## Restore Redis data (requires BACKUP_FILE variable)
-	@if [ -z "$(BACKUP_FILE)" ]; then echo "Error: BACKUP_FILE variable required"; exit 1; fi
-	@echo "Restoring Redis data from $(BACKUP_FILE)..."
-	@$(COMPOSE_CMD) stop redis
-	@docker run --rm -v menu-translation_redis_data:/data -v $(PWD):/backup alpine tar xzf /backup/$(BACKUP_FILE) -C /data
-	@$(COMPOSE_CMD) start redis
-	@echo "Restore completed"
-
 stats: ## Show container resource usage
 	@docker stats --no-stream
 
-# Environment setup targets
-setup-dev: ## Setup development environment
-	@echo "Setting up development environment..."
-	@cp .env.development .env
-	@$(MAKE) dev-build
-	@$(MAKE) dev
+# Combined commands
+dev: build up ## Build and start development environment
 
-setup-staging: ## Setup staging environment
-	@echo "Setting up staging environment..."
-	@cp .env.staging .env
-	@$(MAKE) ENV=staging build
-	@$(MAKE) staging
-
-setup-prod: ## Setup production environment
-	@echo "Setting up production environment..."
-	@cp .env.production .env
-	@$(MAKE) ENV=production build
-	@$(MAKE) prod
-
-# Maintenance targets
-update: ## Update and rebuild services
-	@echo "Updating services for $(ENV) environment..."
-	@$(COMPOSE_CMD) pull
-	@$(COMPOSE_CMD) build --no-cache
-	@$(COMPOSE_CMD) up -d
-
-reset: ## Reset environment (clean + build + up)
-	@echo "Resetting $(ENV) environment..."
-	@$(MAKE) ENV=$(ENV) clean
-	@$(MAKE) ENV=$(ENV) build
-	@$(MAKE) ENV=$(ENV) up
+reset: clean build up ## Reset environment (clean + build + up)

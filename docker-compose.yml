@@ -1,5 +1,5 @@
 # Docker Compose configuration for Menu Translation Backend
-# Supports development, staging, and production environments
+# Local development environment
 
 version: '3.8'
 
@@ -9,23 +9,21 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development  # Use development stage by default
-      args:
-        ENVIRONMENT: development
-        APP_VERSION: ${APP_VERSION:-1.0.0}
+      target: development
     container_name: menu-translation-backend
     ports:
-      - "${HOST_PORT:-8000}:8000"
+      - "8000:8000"
     environment:
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=development
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_DB=0
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
     volumes:
-      # Mount source code for development (hot reload)
-      - ./app:/app/app:ro
-      - ./run.py:/app/run.py:ro
-      - ./.env.${ENVIRONMENT:-development}:/app/.env.${ENVIRONMENT:-development}:ro
+      # Mount source code for hot reload
+      - ./app:/app/app
+      - ./run.py:/app/run.py
       # Persistent volumes
       - app_logs:/app/logs
       - app_temp:/app/temp
@@ -48,20 +46,11 @@ services:
     image: redis:7-alpine
     container_name: menu-translation-redis
     ports:
-      - "${REDIS_HOST_PORT:-6379}:6379"
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - "6379:6379"
     volumes:
       - redis_data:/data
       - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    command: >
-      sh -c "
-        if [ -n '$$REDIS_PASSWORD' ]; then
-          redis-server /usr/local/etc/redis/redis.conf --requirepass $$REDIS_PASSWORD
-        else
-          redis-server /usr/local/etc/redis/redis.conf
-        fi
-      "
+    command: redis-server /usr/local/etc/redis/redis.conf
     networks:
       - menu-translation-network
     restart: unless-stopped
@@ -71,44 +60,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-
-  # Redis Commander (Web UI for Redis - development only)
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: menu-translation-redis-ui
-    ports:
-      - "${REDIS_UI_PORT:-8081}:8081"
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - menu-translation-network
-    restart: unless-stopped
-    profiles:
-      - development
-      - debug
-
-  # Nginx reverse proxy (for production)
-  nginx:
-    image: nginx:alpine
-    container_name: menu-translation-nginx
-    ports:
-      - "${NGINX_HTTP_PORT:-80}:80"
-      - "${NGINX_HTTPS_PORT:-443}:443"
-    volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
-      - nginx_logs:/var/log/nginx
-    depends_on:
-      - menu-translation-backend
-    networks:
-      - menu-translation-network
-    restart: unless-stopped
-    profiles:
-      - production
 
 # Named volumes for data persistence
 volumes:
@@ -120,13 +71,8 @@ volumes:
     driver: local
   app_models:
     driver: local
-  nginx_logs:
-    driver: local
 
 # Custom network
 networks:
   menu-translation-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
