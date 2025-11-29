@@ -12,7 +12,7 @@ from collections import defaultdict, deque
 import statistics
 
 from app.core.dependencies import get_current_user
-from app.models.internal_models import User
+from app.models.user import User
 from app.core.metrics_translation import (
     snapshot_latency_stats as translation_latency,
 )

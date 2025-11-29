@@ -1,7 +1,7 @@
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func
+from app.core.db import Base
 
-Base = declarative_base()
 
 class Favorite(Base):
     __tablename__ = "favorites"

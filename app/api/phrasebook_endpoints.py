@@ -3,7 +3,7 @@ Phrasebook API endpoints - Context-aware phrase suggestions and favorites
 """
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.core.db import get_db
@@ -14,19 +14,19 @@ from app.models.phrase import Phrase
 from app.models.favorite import Favorite
 from app.schemas.phrase import PhraseSuggestionResponse, PhraseCreate, PhraseRead
 from app.schemas.favorite import FavoriteCreate, FavoriteRead
-from app.schemas.api_models import Envelope
+from app.schemas.base import Envelope
 from app.services.phrase_suggestion_service import PhraseSuggestionService
 from app.core.metrics_navigation_phrase import record_phrase_latency
 
 router = APIRouter(prefix="/phrases", tags=["phrasebook"])
 
 
-@router.get("", response_model=Envelope[PhraseSuggestionResponse])
+@router.get("/suggestions", response_model=Envelope[PhraseSuggestionResponse])
 async def get_phrase_suggestions(
     context: str,
     target_language: str = "ja",
     limit: int = 20,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     cache_client: Optional[CacheClient] = Depends(get_cache_client),
     current_user: User = Depends(get_current_user),
 ):
@@ -60,7 +60,7 @@ async def get_phrase_suggestions(
 )
 async def create_phrase(
     phrase: PhraseCreate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -78,8 +78,8 @@ async def create_phrase(
         context_category=phrase.context_category,
     )
     db.add(new_phrase)
-    await db.commit()
-    await db.refresh(new_phrase)
+    db.commit()
+    db.refresh(new_phrase)
     
     return Envelope(
         status="ok",
@@ -97,7 +97,7 @@ async def create_phrase(
 @router.post("/{phrase_id}/favorite", response_model=Envelope[FavoriteRead])
 async def toggle_favorite_phrase(
     phrase_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -107,7 +107,7 @@ async def toggle_favorite_phrase(
     """
     # Check if phrase exists
     stmt = select(Phrase).where(Phrase.id == phrase_id)
-    result = await db.execute(stmt)
+    result = db.execute(stmt)
     phrase = result.scalar_one_or_none()
     
     if not phrase:
@@ -119,13 +119,13 @@ async def toggle_favorite_phrase(
         Favorite.target_type == "phrase",
         Favorite.target_id == phrase_id,
     )
-    result = await db.execute(stmt)
+    result = db.execute(stmt)
     existing = result.scalar_one_or_none()
     
     if existing:
         # Remove favorite
-        await db.delete(existing)
-        await db.commit()
+        db.delete(existing)
+        db.commit()
         return Envelope(
             status="ok",
             data={"favorited": False, "phrase_id": phrase_id}
@@ -138,8 +138,8 @@ async def toggle_favorite_phrase(
             target_id=phrase_id,
         )
         db.add(favorite)
-        await db.commit()
-        await db.refresh(favorite)
+        db.commit()
+        db.refresh(favorite)
         
         return Envelope(
             status="ok",
@@ -155,7 +155,7 @@ async def toggle_favorite_phrase(
 
 @router.get("/favorites", response_model=Envelope[list[PhraseRead]])
 async def get_favorite_phrases(
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -169,7 +169,7 @@ async def get_favorite_phrases(
             Favorite.target_type == "phrase",
         )
     )
-    result = await db.execute(stmt)
+    result = db.execute(stmt)
     favorites = result.scalars().all()
     
     # Fetch actual phrase objects
@@ -178,7 +178,7 @@ async def get_favorite_phrases(
         return Envelope(status="ok", data=[])
     
     stmt = select(Phrase).where(Phrase.id.in_(phrase_ids))
-    result = await db.execute(stmt)
+    result = db.execute(stmt)
     phrases = result.scalars().all()
     
     phrase_list = [

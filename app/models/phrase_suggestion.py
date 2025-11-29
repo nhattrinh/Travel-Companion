@@ -3,10 +3,8 @@
 Task: T148
 Links suggested phrases with relevance and optional user/context.
 """
-from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String, Float, DateTime, func
-
-Base = declarative_base()
+from app.core.db import Base
 
 
 class PhraseSuggestion(Base):

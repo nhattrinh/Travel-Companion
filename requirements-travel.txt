@@ -1,0 +1,5 @@
+# Optional dependencies for Travel Companion iOS/backend extras
+# Keep this file minimal; override as needed per environment.
+# Example packages (uncomment if required):
+# pillow==10.3.0
+# pytesseract==0.3.10

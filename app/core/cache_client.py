@@ -14,12 +14,19 @@ import json
 from datetime import timedelta
 
 try:
-    import aioredis
-    from aioredis import Redis
+    # Use redis.asyncio (modern approach, replaces deprecated aioredis)
+    from redis import asyncio as aioredis
+    from redis.asyncio import Redis
     REDIS_AVAILABLE = True
 except ImportError:
-    REDIS_AVAILABLE = False
-    Redis = None
+    try:
+        # Fallback to legacy aioredis for older environments
+        import aioredis
+        from aioredis import Redis
+        REDIS_AVAILABLE = True
+    except ImportError:
+        REDIS_AVAILABLE = False
+        Redis = None
 
 from app.config.settings import settings
 
@@ -51,13 +58,14 @@ class CacheClient:
         Args:
             redis_url: Redis connection URL (optional, uses settings if not provided)
         """
-        self.redis_url = redis_url or settings.redis_url
+        self.redis_url = redis_url or settings.redis.url
         self.redis_client: Optional[Redis] = None
         self.logger = logging.getLogger(__name__)
         self._connection_lock = asyncio.Lock()
         self._is_connected = False
         self._connection_retries = 0
         self._max_retries = 3
+        self.enabled = REDIS_AVAILABLE  # Track if Redis is available
         
         if not REDIS_AVAILABLE:
             self.logger.warning("Redis dependencies not available, cache will be disabled")
@@ -377,7 +385,7 @@ async def get_cache_client() -> Optional[CacheClient]:
     global cache_client
     
     if cache_client is None:
-        if not REDIS_AVAILABLE or not settings.redis_url:
+        if not REDIS_AVAILABLE or not settings.redis.url:
             return None
         
         cache_client = CacheClient()

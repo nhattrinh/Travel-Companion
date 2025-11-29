@@ -30,7 +30,7 @@ class Trip(Base):
     start_date = Column(DateTime(timezone=True), nullable=False, index=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
     status = Column(SQLEnum(TripStatus), default=TripStatus.ACTIVE, nullable=False, index=True)
-    metadata = Column(JSONB, nullable=True)  # Flexible storage for notes, preferences, etc.
+    trip_metadata = Column(JSONB, nullable=True)  # Flexible storage for notes, preferences, etc.
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

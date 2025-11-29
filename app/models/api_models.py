@@ -162,6 +162,11 @@ class StandardErrorResponse(BaseModel):
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+    
     @validator('error_code')
     def validate_error_code(cls, v):
         """Validate error code format (Requirement 8.1)"""

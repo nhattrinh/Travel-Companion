@@ -3,14 +3,14 @@ Trip API endpoints - Trip lifecycle and summary retrieval
 """
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.trip import TripStatus
 from app.schemas.trip import TripCreate, TripRead, TripUpdate, TripSummaryResponse
-from app.schemas.api_models import Envelope
+from app.schemas.base import Envelope
 from app.services.trip_service import TripService
 
 router = APIRouter(prefix="/trips", tags=["trips"])
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/trips", tags=["trips"])
 @router.post("", response_model=Envelope[TripRead], status_code=status.HTTP_201_CREATED)
 async def create_trip(
     trip_data: TripCreate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -31,7 +31,7 @@ async def create_trip(
     - **metadata**: Optional flexible metadata (notes, preferences)
     """
     service = TripService(db)
-    trip = await service.create_trip(current_user.id, trip_data)
+    trip = service.create_trip(current_user.id, trip_data)
     
     return Envelope(
         status="ok",
@@ -43,7 +43,7 @@ async def create_trip(
 async def list_trips(
     status_filter: Optional[TripStatus] = Query(None, alias="status"),
     limit: int = Query(20, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -53,7 +53,7 @@ async def list_trips(
     - **limit**: Max results (default 20, max 100)
     """
     service = TripService(db)
-    trips = await service.list_user_trips(current_user.id, status_filter, limit)
+    trips = service.list_user_trips(current_user.id, status_filter, limit)
     
     trip_list = [TripRead.model_validate(t) for t in trips]
     
@@ -62,14 +62,14 @@ async def list_trips(
 
 @router.get("/active", response_model=Envelope[Optional[TripRead]])
 async def get_active_trip(
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get user's current active trip
     """
     service = TripService(db)
-    trip = await service.get_active_trip(current_user.id)
+    trip = service.get_active_trip(current_user.id)
     
     if not trip:
         return Envelope(status="ok", data=None)
@@ -83,14 +83,14 @@ async def get_active_trip(
 @router.get("/{trip_id}", response_model=Envelope[TripRead])
 async def get_trip(
     trip_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get a specific trip by ID
     """
     service = TripService(db)
-    trip = await service.get_trip(trip_id, current_user.id)
+    trip = service.get_trip(trip_id, current_user.id)
     
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
@@ -104,7 +104,7 @@ async def get_trip(
 @router.get("/{trip_id}/summary", response_model=Envelope[TripSummaryResponse])
 async def get_trip_summary(
     trip_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -116,7 +116,7 @@ async def get_trip_summary(
     - Recent translations (last 5)
     """
     service = TripService(db)
-    summary = await service.get_trip_summary(trip_id, current_user.id)
+    summary = service.get_trip_summary(trip_id, current_user.id)
     
     if not summary:
         raise HTTPException(status_code=404, detail="Trip not found")
@@ -128,7 +128,7 @@ async def get_trip_summary(
 async def update_trip(
     trip_id: int,
     trip_data: TripUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -137,7 +137,7 @@ async def update_trip(
     All fields optional - only provided fields will be updated
     """
     service = TripService(db)
-    trip = await service.update_trip(trip_id, current_user.id, trip_data)
+    trip = service.update_trip(trip_id, current_user.id, trip_data)
     
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
@@ -151,7 +151,7 @@ async def update_trip(
 @router.post("/{trip_id}/complete", response_model=Envelope[TripRead])
 async def complete_trip(
     trip_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -160,7 +160,7 @@ async def complete_trip(
     Sets status to 'completed' and end_date to now if not already set
     """
     service = TripService(db)
-    trip = await service.complete_trip(trip_id, current_user.id)
+    trip = service.complete_trip(trip_id, current_user.id)
     
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")

@@ -151,9 +151,9 @@ async def test_trip_with_metadata(db_session, test_user):
     
     trip = await service.create_trip(test_user.id, trip_data)
     
-    assert trip.metadata is not None
-    assert trip.metadata["notes"] == "Food tour"
-    assert trip.metadata["budget"] == "medium"
+    assert trip.trip_metadata is not None
+    assert trip.trip_metadata["notes"] == "Food tour"
+    assert trip.trip_metadata["budget"] == "medium"
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,6 @@
-from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String, Float, Text
+from app.core.db import Base
 
-Base = declarative_base()
 
 class POI(Base):
     __tablename__ = "pois"

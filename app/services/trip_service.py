@@ -3,7 +3,7 @@ Trip Service - Manages trip lifecycle and aggregations
 """
 from typing import Optional, List
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
 from app.models.trip import Trip, TripStatus
@@ -15,10 +15,10 @@ from app.schemas.trip import TripCreate, TripUpdate, TripRead, TripSummaryRespon
 class TripService:
     """Manages trip CRUD operations and summary aggregations"""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: Session):
         self.db = db
 
-    async def create_trip(self, user_id: int, trip_data: TripCreate) -> Trip:
+    def create_trip(self, user_id: int, trip_data: TripCreate) -> Trip:
         """
         Create a new trip for a user
         
@@ -35,14 +35,14 @@ class TripService:
             start_date=trip_data.start_date,
             end_date=trip_data.end_date,
             status=TripStatus.ACTIVE,
-            metadata=trip_data.metadata or {},
+            trip_metadata=trip_data.metadata or {},
         )
         self.db.add(trip)
-        await self.db.commit()
-        await self.db.refresh(trip)
+        self.db.commit()
+        self.db.refresh(trip)
         return trip
 
-    async def get_trip(self, trip_id: int, user_id: int) -> Optional[Trip]:
+    def get_trip(self, trip_id: int, user_id: int) -> Optional[Trip]:
         """
         Get a trip by ID (scoped to user)
         
@@ -57,10 +57,10 @@ class TripService:
             Trip.id == trip_id,
             Trip.user_id == user_id
         )
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_active_trip(self, user_id: int) -> Optional[Trip]:
+    def get_active_trip(self, user_id: int) -> Optional[Trip]:
         """
         Get user's active trip
         
@@ -74,10 +74,10 @@ class TripService:
             Trip.user_id == user_id,
             Trip.status == TripStatus.ACTIVE
         ).order_by(Trip.start_date.desc())
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_user_trips(
+    def list_user_trips(
         self,
         user_id: int,
         status: Optional[TripStatus] = None,
@@ -100,10 +100,10 @@ class TripService:
             stmt = stmt.where(Trip.status == status)
         
         stmt = stmt.order_by(Trip.start_date.desc()).limit(limit)
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         return result.scalars().all()
 
-    async def update_trip(
+    def update_trip(
         self,
         trip_id: int,
         user_id: int,
@@ -120,7 +120,7 @@ class TripService:
         Returns:
             Updated trip or None
         """
-        trip = await self.get_trip(trip_id, user_id)
+        trip = self.get_trip(trip_id, user_id)
         if not trip:
             return None
         
@@ -128,11 +128,11 @@ class TripService:
         for field, value in update_fields.items():
             setattr(trip, field, value)
         
-        await self.db.commit()
-        await self.db.refresh(trip)
+        self.db.commit()
+        self.db.refresh(trip)
         return trip
 
-    async def complete_trip(self, trip_id: int, user_id: int) -> Optional[Trip]:
+    def complete_trip(self, trip_id: int, user_id: int) -> Optional[Trip]:
         """
         Mark a trip as completed
         
@@ -143,18 +143,18 @@ class TripService:
         Returns:
             Completed trip or None
         """
-        trip = await self.get_trip(trip_id, user_id)
+        trip = self.get_trip(trip_id, user_id)
         if not trip:
             return None
         
         trip.status = TripStatus.COMPLETED
         trip.end_date = trip.end_date or datetime.utcnow()
         
-        await self.db.commit()
-        await self.db.refresh(trip)
+        self.db.commit()
+        self.db.refresh(trip)
         return trip
 
-    async def get_trip_summary(self, trip_id: int, user_id: int) -> Optional[TripSummaryResponse]:
+    def get_trip_summary(self, trip_id: int, user_id: int) -> Optional[TripSummaryResponse]:
         """
         Get trip with aggregated statistics
         
@@ -165,13 +165,13 @@ class TripService:
         Returns:
             Trip summary with counts and recent translations
         """
-        trip = await self.get_trip(trip_id, user_id)
+        trip = self.get_trip(trip_id, user_id)
         if not trip:
             return None
         
         # Count translations
         stmt = select(func.count(Translation.id)).where(Translation.trip_id == trip_id)
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         translation_count = result.scalar() or 0
         
         # Count favorites (during this trip)
@@ -182,7 +182,7 @@ class TripService:
         )
         if trip.end_date:
             stmt = stmt.where(Favorite.created_at <= trip.end_date)
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         favorite_count = result.scalar() or 0
         
         # Get recent translations (last 5)
@@ -192,7 +192,7 @@ class TripService:
             .order_by(Translation.created_at.desc())
             .limit(5)
         )
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         recent = result.scalars().all()
         
         recent_translations = [
@@ -214,7 +214,7 @@ class TripService:
             recent_translations=recent_translations,
         )
 
-    async def purge_old_completed_trips(self, retention_days: int = 30) -> int:
+    def purge_old_completed_trips(self, retention_days: int = 30) -> int:
         """
         Delete completed trips older than retention period
         
@@ -230,12 +230,12 @@ class TripService:
             Trip.status == TripStatus.COMPLETED,
             Trip.updated_at < cutoff_date
         )
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         old_trips = result.scalars().all()
         
         count = len(old_trips)
         for trip in old_trips:
-            await self.db.delete(trip)
+            self.db.delete(trip)
         
-        await self.db.commit()
+        self.db.commit()
         return count

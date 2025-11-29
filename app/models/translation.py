@@ -1,7 +1,7 @@
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import relationship
+from app.core.db import Base
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, func
 
-Base = declarative_base()
 
 class Translation(Base):
     __tablename__ = "translations"

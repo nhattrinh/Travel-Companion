@@ -1,8 +1,9 @@
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import relationship
 from sqlalchemy import Column, String, Integer, DateTime, func, Text
 from sqlalchemy.dialects.postgresql import JSONB
 
-Base = declarative_base()
+from app.core.db import Base
+
 
 class User(Base):
     __tablename__ = "users"

@@ -68,7 +68,7 @@ class ServiceContainer:
                 # Initialize concurrency manager
                 from app.models.internal_models import ConcurrencyConfig
                 concurrency_config = ConcurrencyConfig(
-                    max_concurrent_requests=settings.max_concurrent_requests,
+                    max_concurrent_requests=settings.concurrency.max_concurrent_requests,
                     queue_timeout_seconds=30,
                     processing_timeout_seconds=120,
                     memory_limit_mb=1024
@@ -456,3 +456,54 @@ async def verify_api_key(request: Request) -> Optional[str]:
     # TODO: Implement actual API key validation in later tasks
     # For now, just return the key
     return api_key
+
+
+async def get_current_user(request: Request):
+    """
+    Get the current authenticated user from the request.
+    
+    This is a placeholder that will be fully implemented in auth endpoints.
+    For now, returns a mock user for development.
+    
+    Args:
+        request: The FastAPI request object
+        
+    Returns:
+        User object if authenticated
+        
+    Raises:
+        HTTPException: If not authenticated
+    """
+    from app.core.security import verify_token
+    from app.models.user import User
+    from app.core.db import SessionLocal
+    
+    # Get token from Authorization header
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        # For development, return a mock user if no auth header
+        # In production, this should raise 401
+        mock_user = User(id=1, email="dev@example.com", hashed_password="")
+        return mock_user
+    
+    token = auth_header.replace("Bearer ", "")
+    payload = verify_token(token)
+    
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication token"
+        )
+    
+    # Get user from database
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == payload["sub"]).first()
+        if not user:
+            raise HTTPException(
+                status_code=401,
+                detail="User not found"
+            )
+        return user
+    finally:
+        db.close()

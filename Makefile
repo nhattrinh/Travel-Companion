@@ -31,6 +31,20 @@ help: ## Show this help message
 	@echo ""
 	@echo "Targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
+travel: ## Start Travel Companion stack (api + postgres + redis)
+	@echo "Starting Travel Companion stack using docker-compose.travel.yml"
+	@export $$(grep -v '^#' .env.development | xargs) && docker compose -f docker-compose.travel.yml up -d
+	@docker compose -f docker-compose.travel.yml ps
+
+travel-down: ## Stop Travel Companion stack
+	@docker compose -f docker-compose.travel.yml down
+
+travel-logs: ## Tail API logs
+	@docker compose -f docker-compose.travel.yml logs -f api
+
+travel-restart: ## Restart API container
+	@docker compose -f docker-compose.travel.yml restart api
+
 
 build: ## Build Docker images
 	@echo "Building images for $(ENV) environment..."

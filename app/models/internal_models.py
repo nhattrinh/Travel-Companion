@@ -309,7 +309,7 @@ class SystemHealth:
 
 
 @dataclass
-class SystemHealth:
+class DetailedSystemHealth:
     """Comprehensive system health information for detailed status endpoint"""
     status: str
     timestamp: datetime

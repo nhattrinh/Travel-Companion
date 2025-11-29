@@ -1,8 +1,7 @@
-from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
+from app.core.db import Base
 
-Base = declarative_base()
 
 class Phrase(Base):
     __tablename__ = "phrases"

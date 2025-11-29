@@ -64,7 +64,7 @@ class FoodImageService:
         self.logger = logging.getLogger(__name__)
         
         # Cache TTL from settings
-        self.cache_ttl_seconds = settings.cache_ttl_seconds
+        self.cache_ttl_seconds = settings.redis.cache_ttl_seconds
         
         # In-memory fallback cache when Redis is unavailable
         self._memory_cache: Dict[str, Dict[str, Any]] = {}

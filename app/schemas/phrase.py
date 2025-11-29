@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from typing import Any
+
 
 class PhraseRead(BaseModel):
     id: int
@@ -14,5 +16,6 @@ class PhraseCreate(BaseModel):
     context_category: str
 
 class PhraseSuggestionResponse(BaseModel):
-    phrases: list[PhraseRead]
     context: str
+    target_language: str
+    suggestions: list[dict[str, Any]]

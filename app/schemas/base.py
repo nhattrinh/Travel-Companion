@@ -1,10 +1,14 @@
 from pydantic import BaseModel
-from typing import Any, Optional
+from typing import Any, Optional, Generic, TypeVar
 
-class Envelope(BaseModel):
+T = TypeVar('T')
+
+
+class Envelope(BaseModel, Generic[T]):
     status: str
-    data: Any | None = None
+    data: Optional[T] = None
     error: Optional[str] = None
+
 
 class Message(BaseModel):
     message: str

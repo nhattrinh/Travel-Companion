@@ -13,7 +13,17 @@ import asyncio
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-from config import get_settings
+from app.config import get_settings
+
+# Import all SQLAlchemy models to ensure relationship resolution works
+# This must happen before any model is used
+from app.models.user import User
+from app.models.trip import Trip
+from app.models.translation import Translation
+from app.models.favorite import Favorite
+from app.models.phrase import Phrase
+from app.models.phrase_suggestion import PhraseSuggestion
+from app.models.poi import POI
 
 # Get application settings
 settings = get_settings()
@@ -48,6 +58,11 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     
     try:
+        # Create database tables if they don't exist
+        from app.core.db import Base, engine
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified")
+        
         # Initialize service container
         from app.core.dependencies import service_container
         await service_container.initialize_services()
@@ -236,13 +251,15 @@ async def health_check():
     try:
         # Check database connection
         try:
-            async for db in get_db():
-                result = await db.execute(text("SELECT 1"))
+            db = next(get_db())
+            try:
+                result = db.execute(text("SELECT 1"))
                 health_details["database"] = {
                     "status": "healthy",
                     "connection": "ok"
                 }
-                break
+            finally:
+                db.close()
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
             health_details["database"] = {

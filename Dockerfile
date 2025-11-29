@@ -32,8 +32,8 @@ COPY requirements.txt .
 COPY requirements-travel.txt ./
 
 # Install Python dependencies (base + optional travel companion extras)
-RUN pip install --no-cache-dir -r requirements.txt && \
-    if [ -f requirements-travel.txt ]; then pip install --no-cache-dir -r requirements-travel.txt; fi
+RUN pip install -r requirements.txt && \
+    if [ -f requirements-travel.txt ]; then pip install -r requirements-travel.txt; fi
 
 # Copy application code
 COPY app/ ./app/
@@ -117,7 +117,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install development Python packages
-RUN pip install --no-cache-dir \
+RUN pip install \
     pytest \
     pytest-asyncio \
     pytest-cov \
