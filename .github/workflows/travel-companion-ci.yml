@@ -1,0 +1,24 @@
+name: Travel Companion CI
+on:
+  push:
+    branches: [ "001-travel-companion" ]
+  pull_request:
+    branches: [ "001-travel-companion" ]
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          if [ -f requirements-travel.txt ]; then pip install -r requirements-travel.txt; fi
+      - name: Lint
+        run: |
+          black --check app || true
+          flake8 app
+      - name: Tests
+        run: pytest -q

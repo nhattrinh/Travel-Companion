@@ -1,0 +1,142 @@
+# =====================
+# Global Git Ignore for Python + FastAPI + Alembic + iOS/Swift + General
+# =====================
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+.env/
+.env.local
+.env.*.local
+
+# Package/build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Byte-compiled / optimized / DLL files
+*.so
+*.dylib
+*.dll
+
+# Test, coverage, profiling
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.prof
+*.prof
+
+# Logs & runtime data
+*.log
+logs/
+*.pid
+
+# Tooling
+.cache/
+ruff_cache/
+.poetry/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ---- FastAPI / App Specific ----
+# Uploaded temp files / media (if any future)
+media/tmp/
+
+# ---- Alembic ----
+# Ignore generated migration cache if present
+alembic/*.pyc
+alembic/__pycache__/
+
+# ---- Redis dump (if created locally) ----
+dump.rdb
+
+# ---- iOS / Swift / Xcode ----
+# Build products
+DerivedData/
+Build/
+build/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/xcuserdata/ # Usually ignore user data; keep if necessary
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+
+# Swift Package Manager
+.swiftpm/
+.build/
+Packages/
+/*.swiftpm
+
+# CocoaPods
+Pods/
+*.podspec.json
+
+# Carthage
+Carthage/Build/
+
+# Xcode user data
+xcuserdata/
+
+# iOS artifacts
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Simulator/device state
+*.xcuserstate
+
+# ---- General OS / Editor ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# Node (if any frontend tooling added later)
+node_modules/
+*.tsbuildinfo
+
+# ---- Docker ----
+# Ignore build cache layers if exported
+*.tar
+
+# ---- Secrets / Keys ----
+*.key
+*.pem
+*.crt
+secrets/
+
+# ---- Data / Artifacts ----
+# Large data dumps or exports
+exports/
+*.csv
+*.sqlite
+*.db
+
+# ---- Images for tests (if generated) ----
+/tmp_images/
+
+# ---- Misc ----
+*.bak
+*.orig
+*.swp
+*~
+
+venv/
+
+# End of file
