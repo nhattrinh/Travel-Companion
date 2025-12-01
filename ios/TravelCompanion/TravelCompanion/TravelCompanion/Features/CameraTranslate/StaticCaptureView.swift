@@ -9,6 +9,16 @@ struct StaticCaptureView: View {
     @State private var selectedImage: UIImage?
     @State private var showingImagePicker = false
     @State private var selectedSegment: TranslationSegment?
+    @Environment(\.dismiss) private var dismiss
+    
+    // Optional initial image passed from MenuView
+    var initialImage: UIImage?
+    var onDismiss: (() -> Void)?
+    
+    init(image: UIImage? = nil, onDismiss: (() -> Void)? = nil) {
+        self.initialImage = image
+        self.onDismiss = onDismiss
+    }
     
     var body: some View {
         NavigationView {
@@ -123,6 +133,14 @@ struct StaticCaptureView: View {
             .navigationTitle("Image Translation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        handleDismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                }
+                
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingImagePicker = true
@@ -130,17 +148,6 @@ struct StaticCaptureView: View {
                         Image(systemName: "photo.badge.plus")
                     }
                     .disabled(viewModel.isProcessing)
-                }
-                
-                if selectedImage != nil {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button {
-                            selectedImage = nil
-                            viewModel.clearSegments()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                        }
-                    }
                 }
             }
             .sheet(isPresented: $showingImagePicker) {
@@ -151,6 +158,19 @@ struct StaticCaptureView: View {
             .sheet(item: $selectedSegment) { segment in
                 SegmentDetailSheet(segment: segment, viewModel: viewModel)
             }
+            .onAppear {
+                if let image = initialImage {
+                    selectedImage = image
+                }
+            }
+        }
+    }
+    
+    private func handleDismiss() {
+        if let onDismiss = onDismiss {
+            onDismiss()
+        } else {
+            dismiss()
         }
     }
 }

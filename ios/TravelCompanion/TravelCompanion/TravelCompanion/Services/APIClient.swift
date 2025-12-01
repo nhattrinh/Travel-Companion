@@ -170,6 +170,37 @@ final class APIClient {
         return try decoder.decode(PhraseSuggestionResponse.self, from: data)
     }
     
+    /// Translate text (no auth required)
+    func translateText(text: String, targetLanguage: String, sourceLanguage: String? = nil) async throws -> TextTranslationResponse {
+        let url = AppEnvironment.translationBaseURL.appendingPathComponent("text")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        var body: [String: Any] = [
+            "text": text,
+            "target_language": targetLanguage
+        ]
+        if let sourceLanguage = sourceLanguage {
+            body["source_language"] = sourceLanguage
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.httpError(httpResponse.statusCode)
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(TextTranslationResponse.self, from: data)
+    }
+    
     /// Fetch user favorites
     func fetchFavorites(itemType: String, token: String) async throws -> FavoritesResponse {
         var components = URLComponents(url: AppEnvironment.favoritesBaseURL, resolvingAgainstBaseURL: true)!

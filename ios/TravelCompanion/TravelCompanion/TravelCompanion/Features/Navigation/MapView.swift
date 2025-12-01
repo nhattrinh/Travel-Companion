@@ -6,162 +6,256 @@ struct MapView: View {
     @StateObject private var viewModel = NavigationViewModel()
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 35.6762, longitude: 139.6503),
-        span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
     )
-    @State private var showingRadiusSelector = false
-    @State private var selectedRadius = 1000
+    @FocusState private var isSearchFocused: Bool
     
     var body: some View {
-        ZStack {
-            Map(coordinateRegion: $region, annotationItems: viewModel.pois) { poi in
-                MapAnnotation(coordinate: poi.coordinate) {
-                    POIMarker(poi: poi) {
-                        viewModel.selectPOI(poi)
-                    }
-                }
-            }
-            .ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            // Map with route overlay
+            mapWithRouteOverlay
+                .ignoresSafeArea()
             
+            // Top controls overlay
             VStack {
+                // Offline banner
                 if viewModel.isOffline {
-                    HStack {
-                        Image(systemName: "wifi.slash")
-                        Text("You are offline. Reconnect to search POIs.")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(.red.opacity(0.9))
-                    .transition(.move(edge: .top))
+                    offlineBanner
                 }
                 
-                Spacer()
+                // Search bar and Get Directions button
+                searchSection
                 
-                if !viewModel.pois.isEmpty {
-                    VStack(spacing: 0) {
-                        HStack {
-                            Text("\(viewModel.pois.count) Places Nearby")
-                                .font(.headline)
-                            Spacer()
-                            Button {
-                                showingRadiusSelector = true
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "slider.horizontal.3")
-                                    Text("\(selectedRadius)m")
-                                        .font(.caption)
-                                }
-                            }
-                        }
-                        .padding()
-                        
-                        Divider()
-                        
-                        ScrollView {
-                            LazyVStack(spacing: 0) {
-                                ForEach(viewModel.pois) { poi in
-                                    POIListRow(poi: poi) {
-                                        viewModel.selectPOI(poi)
-                                    }
-                                    Divider()
-                                }
-                            }
-                        }
-                        .frame(maxHeight: 300)
-                    }
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(16, corners: [.topLeft, .topRight])
-                    .shadow(radius: 10)
-                }
-            }
-            
-            VStack {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 12) {
-                        Button {
-                            centerOnUser()
-                        } label: {
-                            Image(systemName: "location.fill")
-                                .foregroundColor(.white)
-                                .padding(12)
-                                .background(.blue)
-                                .clipShape(Circle())
-                                .shadow(radius: 4)
-                        }
-                        
-                        Button {
-                            Task { await viewModel.refresh() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundColor(.white)
-                                .padding(12)
-                                .background(.green)
-                                .clipShape(Circle())
-                                .shadow(radius: 4)
-                        }
-                        .disabled(viewModel.isOffline || viewModel.isLoading)
-                    }
-                    .padding()
-                }
                 Spacer()
             }
             
-            if viewModel.isLoading {
-                ProgressView("Searching nearby...")
-                    .padding()
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(12)
+            // Floating controls
+            floatingControls
+            
+            // Loading overlay
+            if viewModel.isLoadingDirections {
+                loadingOverlay
             }
             
-            if let error = viewModel.errorMessage {
-                VStack {
-                    Spacer()
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .padding()
-                        .background(.red.opacity(0.8))
-                        .cornerRadius(8)
-                        .padding()
-                }
+            // Error message
+            if let error = viewModel.directionsError {
+                errorBanner(error)
             }
-        }
-        .sheet(item: $viewModel.selectedPOI) { poi in
-            POIDetailView(poi: poi, viewModel: viewModel)
-        }
-        .confirmationDialog("Search Radius", isPresented: $showingRadiusSelector, titleVisibility: .visible) {
-            Button("500 meters") {
-                selectedRadius = 500
-                Task { await viewModel.fetchNearbyPOIs(radiusMeters: 500) }
-            }
-            Button("1 kilometer (Default)") {
-                selectedRadius = 1000
-                Task { await viewModel.fetchNearbyPOIs(radiusMeters: 1000) }
-            }
-            Button("2 kilometers") {
-                selectedRadius = 2000
-                Task { await viewModel.fetchNearbyPOIs(radiusMeters: 2000) }
-            }
-            Button("5 kilometers") {
-                selectedRadius = 5000
-                Task { await viewModel.fetchNearbyPOIs(radiusMeters: 5000) }
+            
+            // Directions drawer
+            if viewModel.showDirectionsDrawer, let route = viewModel.currentRoute {
+                DirectionsDrawer(
+                    route: route,
+                    drawerHeight: $viewModel.drawerHeight,
+                    onClose: { viewModel.clearRoute() }
+                )
+                .transition(.move(edge: .bottom))
             }
         }
         .task {
             await viewModel.requestLocationPermission()
-            await viewModel.fetchNearbyPOIs()
         }
         .onReceive(viewModel.$userLocation) { newLocation in
-            if let location = newLocation {
+            if let location = newLocation, viewModel.currentRoute == nil {
                 withAnimation {
                     region.center = location
                 }
             }
         }
+        .onReceive(viewModel.$currentRoute) { route in
+            if let route = route, !route.routeCoordinates.isEmpty {
+                // Adjust map to show the entire route
+                adjustMapToShowRoute(route)
+            }
+        }
     }
     
+    // MARK: - Map with Route Overlay
+    private var mapWithRouteOverlay: some View {
+        Map(coordinateRegion: $region, annotationItems: routeAnnotations) { annotation in
+            MapAnnotation(coordinate: annotation.coordinate) {
+                RouteMarker(annotation: annotation)
+            }
+        }
+    }
+    
+    // MARK: - Route Annotations
+    private var routeAnnotations: [RouteAnnotation] {
+        guard let route = viewModel.currentRoute else { return [] }
+        return route.waypoints.compactMap { waypoint -> RouteAnnotation? in
+            guard let coord = waypoint.coordinate else { return nil }
+            return RouteAnnotation(
+                id: waypoint.id,
+                coordinate: coord,
+                name: waypoint.name,
+                type: waypoint.type,
+                icon: waypoint.icon
+            )
+        }
+    }
+    
+    // MARK: - Search Section
+    private var searchSection: some View {
+        VStack(spacing: 12) {
+            // Destination search field
+            HStack(spacing: 12) {
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Where do you want to go?", text: $viewModel.destinationQuery)
+                        .textFieldStyle(.plain)
+                        .focused($isSearchFocused)
+                        .submitLabel(.search)
+                        .onSubmit {
+                            if !viewModel.destinationQuery.isEmpty {
+                                Task {
+                                    await viewModel.getDirections()
+                                }
+                            }
+                        }
+                    
+                    if !viewModel.destinationQuery.isEmpty {
+                        Button {
+                            viewModel.destinationQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            }
+            
+            // Get Directions button - only show when there's text
+            if !viewModel.destinationQuery.isEmpty {
+                Button {
+                    isSearchFocused = false
+                    Task {
+                        await viewModel.getDirections()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "figure.walk")
+                        Text("Get Walking Directions")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.blue)
+                    .cornerRadius(12)
+                    .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                }
+                .disabled(viewModel.isLoadingDirections || viewModel.isOffline)
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.destinationQuery.isEmpty)
+    }
+    
+    // MARK: - Floating Controls
+    private var floatingControls: some View {
+        VStack {
+            HStack {
+                Spacer()
+                VStack(spacing: 12) {
+                    // Center on user button
+                    Button {
+                        centerOnUser()
+                    } label: {
+                        Image(systemName: "location.fill")
+                            .foregroundColor(.white)
+                            .padding(12)
+                            .background(.blue)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    
+                    // Clear route button (if route exists)
+                    if viewModel.currentRoute != nil {
+                        Button {
+                            withAnimation {
+                                viewModel.clearRoute()
+                            }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .foregroundColor(.white)
+                                .padding(12)
+                                .background(.red)
+                                .clipShape(Circle())
+                                .shadow(radius: 4)
+                        }
+                    }
+                }
+                .padding()
+            }
+            Spacer()
+        }
+        .padding(.top, 120) // Below search bar
+    }
+    
+    // MARK: - Offline Banner
+    private var offlineBanner: some View {
+        HStack {
+            Image(systemName: "wifi.slash")
+            Text("You are offline. Directions unavailable.")
+                .font(.caption)
+        }
+        .foregroundColor(.white)
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(.red.opacity(0.9))
+        .transition(.move(edge: .top))
+    }
+    
+    // MARK: - Loading Overlay
+    private var loadingOverlay: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+            Text("Getting walking directions...")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding(24)
+        .background(.ultraThinMaterial)
+        .cornerRadius(16)
+        .shadow(radius: 10)
+    }
+    
+    // MARK: - Error Banner
+    private func errorBanner(_ message: String) -> some View {
+        VStack {
+            Spacer()
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.yellow)
+                Text(message)
+                    .font(.caption)
+                Spacer()
+                Button {
+                    viewModel.directionsError = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption)
+                }
+            }
+            .foregroundColor(.white)
+            .padding()
+            .background(.red.opacity(0.9))
+            .cornerRadius(12)
+            .padding()
+            .padding(.bottom, viewModel.showDirectionsDrawer ? viewModel.drawerHeight.height : 0)
+        }
+    }
+    
+    // MARK: - Helper Methods
     private func centerOnUser() {
         if let location = viewModel.userLocation {
             withAnimation {
@@ -169,39 +263,75 @@ struct MapView: View {
             }
         }
     }
+    
+    private func adjustMapToShowRoute(_ route: WalkingRoute) {
+        let coordinates = route.routeCoordinates
+        guard !coordinates.isEmpty else { return }
+        
+        let lats = coordinates.map { $0.latitude }
+        let lngs = coordinates.map { $0.longitude }
+        
+        let minLat = lats.min() ?? 0
+        let maxLat = lats.max() ?? 0
+        let minLng = lngs.min() ?? 0
+        let maxLng = lngs.max() ?? 0
+        
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLng + maxLng) / 2
+        )
+        
+        let span = MKCoordinateSpan(
+            latitudeDelta: max((maxLat - minLat) * 1.5, 0.01),
+            longitudeDelta: max((maxLng - minLng) * 1.5, 0.01)
+        )
+        
+        withAnimation {
+            region = MKCoordinateRegion(center: center, span: span)
+        }
+    }
 }
 
-struct POIMarker: View {
-    let poi: POI
-    let onTap: () -> Void
+// MARK: - Route Annotation Model
+struct RouteAnnotation: Identifiable {
+    let id: String
+    let coordinate: CLLocationCoordinate2D
+    let name: String
+    let type: WaypointType
+    let icon: String
+}
+
+// MARK: - Route Marker View
+struct RouteMarker: View {
+    let annotation: RouteAnnotation
     
     var body: some View {
         VStack(spacing: 0) {
-            Image(systemName: poi.categoryIcon)
-                .font(.system(size: 12))
+            Image(systemName: annotation.icon)
+                .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
-                .padding(8)
-                .background(categoryColor)
+                .padding(10)
+                .background(markerColor)
                 .clipShape(Circle())
+                .shadow(radius: 4)
+            
             Triangle()
-                .fill(categoryColor)
-                .frame(width: 10, height: 6)
-                .offset(y: -1)
+                .fill(markerColor)
+                .frame(width: 12, height: 8)
+                .offset(y: -2)
         }
-        .onTapGesture { onTap() }
     }
     
-    private var categoryColor: Color {
-        switch poi.category.lowercased() {
-        case "restaurant": return .orange
-        case "transit": return .blue
-        case "temple", "shrine": return .purple
-        case "lodging", "hotel": return .green
-        default: return .red
+    private var markerColor: Color {
+        switch annotation.type {
+        case .start: return .green
+        case .intermediate: return .blue
+        case .end: return .red
         }
     }
 }
 
+// MARK: - Triangle Shape
 struct Triangle: Shape {
     func path(in rect: CGRect) -> Path {
         Path { path in
@@ -213,39 +343,7 @@ struct Triangle: Shape {
     }
 }
 
-struct POIListRow: View {
-    let poi: POI
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                Image(systemName: poi.categoryIcon)
-                    .font(.title3)
-                    .foregroundColor(.blue)
-                    .frame(width: 40)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(poi.name)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    Text(poi.category.capitalized)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                Text(poi.distanceFormatted)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-        }
-        .buttonStyle(.plain)
-    }
-}
-
+// MARK: - Corner Radius Extension
 extension View {
     func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: corners))
@@ -264,4 +362,8 @@ struct RoundedCorner: Shape {
         )
         return Path(path.cgPath)
     }
+}
+
+#Preview {
+    MapView()
 }

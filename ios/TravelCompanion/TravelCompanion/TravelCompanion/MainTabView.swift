@@ -7,10 +7,10 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Translation (Camera)
-            CameraView()
+            // Menu (Camera options)
+            MenuView()
                 .tabItem {
-                    Label("Translate", systemImage: "camera.fill")
+                    Label("Menu", systemImage: "square.grid.2x2.fill")
                 }
                 .tag(0)
             
@@ -21,26 +21,19 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
-            // Phrasebook
-            PhraseListView()
+            // Live Translate (Voice)
+            LiveTranslateView()
                 .tabItem {
-                    Label("Phrases", systemImage: "text.bubble.fill")
+                    Label("Phrases", systemImage: "waveform.circle.fill")
                 }
                 .tag(2)
-            
-            // Trip Memory
-            TripOverviewView()
-                .tabItem {
-                    Label("Trips", systemImage: "airplane.circle.fill")
-                }
-                .tag(3)
             
             // Settings
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
-                .tag(4)
+                .tag(3)
         }
         .accentColor(.blue)
     }

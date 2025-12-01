@@ -1,6 +1,8 @@
 """Translation endpoints for live frame and save actions."""
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import Optional
 import time
 from PIL import Image
 from io import BytesIO
@@ -24,6 +26,69 @@ router = APIRouter(prefix="/translation", tags=["translation"])
 ocr_service = OCRService()
 translation_model = MockTranslationModel()
 history_service = TranslationHistoryService(db_session)
+
+
+class TextTranslationRequest(BaseModel):
+    """Request model for text translation"""
+    text: str
+    target_language: str = "en"
+    source_language: Optional[str] = None
+
+
+class TextTranslationResponse(BaseModel):
+    """Response model for text translation"""
+    original_text: str
+    translated_text: str
+    source_language: str
+    target_language: str
+    confidence: float
+
+
+@router.post("/text")
+async def translate_text(request: TextTranslationRequest):
+    """
+    Translate text from one language to another.
+    Auto-detects source language if not provided.
+    """
+    try:
+        start = time.perf_counter()
+        
+        # Detect source language if not provided
+        source_lang = request.source_language
+        if not source_lang:
+            source_lang = detect_language(request.text)
+        
+        # Translate the text
+        result = await translation_model.translate(
+            request.text,
+            target_language=request.target_language,
+            source_language=source_lang,
+        )
+        
+        latency_ms = (time.perf_counter() - start) * 1000.0
+        logger.info(f"Text translation completed in {latency_ms:.2f}ms")
+        
+        response_data = TextTranslationResponse(
+            original_text=request.text,
+            translated_text=result["translated_text"],
+            source_language=source_lang,
+            target_language=request.target_language,
+            confidence=result.get("confidence", 0.95),
+        )
+        
+        return {"status": "ok", "data": response_data.dict(), "error": None}
+        
+    except Exception as e:
+        logger.error(f"Text translation failed: {str(e)}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "data": None,
+                "error": f"TRANSLATION_FAILED: {str(e)}",
+            },
+        )
+
 
 @router.post("/live-frame")
 async def translate_live_frame(

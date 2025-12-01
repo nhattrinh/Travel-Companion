@@ -56,13 +56,208 @@ class BaseTranslationModel(ABC):
 
 
 class MockTranslationModel(BaseTranslationModel):
-    """Mock translation model for development and testing"""
+    """
+    Improved translation model for English, Korean, and Vietnamese.
+    Uses dictionary-based translations for common phrases with fallback.
+    """
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self._supported_languages = {lang.value for lang in SupportedLanguage}
+        self._supported_languages = {"en", "ko", "vi"}
         self._translation_count = 0
         self._detection_count = 0
+        
+        # Common phrase translations (English as base)
+        self._translations = {
+            # Greetings
+            "hello": {"ko": "안녕하세요", "vi": "Xin chào", "en": "Hello"},
+            "hi": {"ko": "안녕", "vi": "Chào", "en": "Hi"},
+            "goodbye": {"ko": "안녕히 가세요", "vi": "Tạm biệt", "en": "Goodbye"},
+            "bye": {"ko": "안녕", "vi": "Tạm biệt", "en": "Bye"},
+            "good morning": {"ko": "좋은 아침이에요", "vi": "Chào buổi sáng", "en": "Good morning"},
+            "good evening": {"ko": "좋은 저녁이에요", "vi": "Chào buổi tối", "en": "Good evening"},
+            "good night": {"ko": "안녕히 주무세요", "vi": "Chúc ngủ ngon", "en": "Good night"},
+            
+            # Politeness
+            "thank you": {"ko": "감사합니다", "vi": "Cảm ơn", "en": "Thank you"},
+            "thanks": {"ko": "고마워요", "vi": "Cảm ơn", "en": "Thanks"},
+            "please": {"ko": "제발", "vi": "Làm ơn", "en": "Please"},
+            "sorry": {"ko": "죄송합니다", "vi": "Xin lỗi", "en": "Sorry"},
+            "excuse me": {"ko": "실례합니다", "vi": "Xin lỗi", "en": "Excuse me"},
+            "you're welcome": {"ko": "천만에요", "vi": "Không có gì", "en": "You're welcome"},
+            
+            # Questions
+            "how are you": {"ko": "어떻게 지내세요?", "vi": "Bạn khỏe không?", "en": "How are you?"},
+            "what is your name": {"ko": "이름이 뭐예요?", "vi": "Bạn tên gì?", "en": "What is your name?"},
+            "where is": {"ko": "어디에 있어요?", "vi": "Ở đâu?", "en": "Where is?"},
+            "how much": {"ko": "얼마예요?", "vi": "Bao nhiêu tiền?", "en": "How much?"},
+            "what time": {"ko": "몇 시예요?", "vi": "Mấy giờ?", "en": "What time?"},
+            
+            # Restaurant
+            "menu": {"ko": "메뉴", "vi": "Thực đơn", "en": "Menu"},
+            "water": {"ko": "물", "vi": "Nước", "en": "Water"},
+            "food": {"ko": "음식", "vi": "Thức ăn", "en": "Food"},
+            "delicious": {"ko": "맛있어요", "vi": "Ngon", "en": "Delicious"},
+            "bill please": {"ko": "계산서 주세요", "vi": "Tính tiền", "en": "Bill please"},
+            "check please": {"ko": "계산해 주세요", "vi": "Tính tiền đi", "en": "Check please"},
+            "i want to order": {"ko": "주문하고 싶어요", "vi": "Tôi muốn gọi món", "en": "I want to order"},
+            "this one please": {"ko": "이거 주세요", "vi": "Cho tôi cái này", "en": "This one please"},
+            "is this spicy": {"ko": "이거 매워요?", "vi": "Cái này cay không?", "en": "Is this spicy?"},
+            "not spicy please": {"ko": "안 맵게 해주세요", "vi": "Không cay nhé", "en": "Not spicy please"},
+            
+            # Directions
+            "left": {"ko": "왼쪽", "vi": "Bên trái", "en": "Left"},
+            "right": {"ko": "오른쪽", "vi": "Bên phải", "en": "Right"},
+            "straight": {"ko": "직진", "vi": "Thẳng", "en": "Straight"},
+            "turn left": {"ko": "왼쪽으로 돌아가세요", "vi": "Rẽ trái", "en": "Turn left"},
+            "turn right": {"ko": "오른쪽으로 돌아가세요", "vi": "Rẽ phải", "en": "Turn right"},
+            "go straight": {"ko": "직진하세요", "vi": "Đi thẳng", "en": "Go straight"},
+            
+            # Transportation
+            "taxi": {"ko": "택시", "vi": "Taxi", "en": "Taxi"},
+            "bus": {"ko": "버스", "vi": "Xe buýt", "en": "Bus"},
+            "train": {"ko": "기차", "vi": "Tàu hỏa", "en": "Train"},
+            "subway": {"ko": "지하철", "vi": "Tàu điện ngầm", "en": "Subway"},
+            "airport": {"ko": "공항", "vi": "Sân bay", "en": "Airport"},
+            "station": {"ko": "역", "vi": "Ga", "en": "Station"},
+            
+            # Hotel
+            "hotel": {"ko": "호텔", "vi": "Khách sạn", "en": "Hotel"},
+            "room": {"ko": "방", "vi": "Phòng", "en": "Room"},
+            "reservation": {"ko": "예약", "vi": "Đặt phòng", "en": "Reservation"},
+            "check in": {"ko": "체크인", "vi": "Nhận phòng", "en": "Check in"},
+            "check out": {"ko": "체크아웃", "vi": "Trả phòng", "en": "Check out"},
+            
+            # Shopping
+            "how much is this": {"ko": "이거 얼마예요?", "vi": "Cái này bao nhiêu?", "en": "How much is this?"},
+            "too expensive": {"ko": "너무 비싸요", "vi": "Đắt quá", "en": "Too expensive"},
+            "discount": {"ko": "할인", "vi": "Giảm giá", "en": "Discount"},
+            "i'll take it": {"ko": "이거 살게요", "vi": "Tôi mua cái này", "en": "I'll take it"},
+            
+            # Emergency
+            "help": {"ko": "도와주세요", "vi": "Cứu tôi", "en": "Help"},
+            "emergency": {"ko": "응급", "vi": "Khẩn cấp", "en": "Emergency"},
+            "hospital": {"ko": "병원", "vi": "Bệnh viện", "en": "Hospital"},
+            "police": {"ko": "경찰", "vi": "Cảnh sát", "en": "Police"},
+            "i need help": {"ko": "도움이 필요해요", "vi": "Tôi cần giúp đỡ", "en": "I need help"},
+            
+            # Common phrases
+            "yes": {"ko": "네", "vi": "Vâng", "en": "Yes"},
+            "no": {"ko": "아니요", "vi": "Không", "en": "No"},
+            "i don't understand": {"ko": "이해가 안 돼요", "vi": "Tôi không hiểu", "en": "I don't understand"},
+            "i don't speak korean": {"ko": "한국어를 못해요", "vi": "Tôi không nói được tiếng Hàn", "en": "I don't speak Korean"},
+            "i don't speak vietnamese": {"ko": "베트남어를 못해요", "vi": "Tôi không nói được tiếng Việt", "en": "I don't speak Vietnamese"},
+            "do you speak english": {"ko": "영어 하세요?", "vi": "Bạn nói tiếng Anh không?", "en": "Do you speak English?"},
+            "i am lost": {"ko": "길을 잃었어요", "vi": "Tôi bị lạc", "en": "I am lost"},
+            "where is the bathroom": {"ko": "화장실이 어디예요?", "vi": "Nhà vệ sinh ở đâu?", "en": "Where is the bathroom?"},
+            "where is the restroom": {"ko": "화장실이 어디예요?", "vi": "Nhà vệ sinh ở đâu?", "en": "Where is the restroom?"},
+            "where is the toilet": {"ko": "화장실이 어디예요?", "vi": "Nhà vệ sinh ở đâu?", "en": "Where is the toilet?"},
+            "bathroom": {"ko": "화장실", "vi": "Nhà vệ sinh", "en": "Bathroom"},
+            "toilet": {"ko": "화장실", "vi": "Nhà vệ sinh", "en": "Toilet"},
+        }
+        
+        # Additional Korean phrase mappings (variations)
+        self._korean_phrases = {
+            "화장실 어디예요": "where is the bathroom",
+            "화장실이 어디예요": "where is the bathroom",
+            "이거 뭐예요": "what is this",
+            "뭐예요": "what is this",
+            "감사합니다": "thank you",
+            "고맙습니다": "thank you",
+            "고마워요": "thanks",
+            "안녕하세요": "hello",
+            "안녕": "hi",
+            "네": "yes",
+            "아니요": "no",
+            "아니": "no",
+            "죄송합니다": "sorry",
+            "미안해요": "sorry",
+            "도와주세요": "help",
+            "얼마예요": "how much",
+            "이거 얼마예요": "how much is this",
+            "물 주세요": "water please",
+            "계산해 주세요": "check please",
+            "맛있어요": "delicious",
+            "주문할게요": "i want to order",
+            "메뉴 주세요": "menu please",
+        }
+        
+        # Additional Vietnamese phrase mappings (variations)
+        self._vietnamese_phrases = {
+            "xin chào": "hello",
+            "chào": "hi",
+            "cảm ơn": "thank you",
+            "cám ơn": "thank you",
+            "xin lỗi": "sorry",
+            "vâng": "yes",
+            "không": "no",
+            "bao nhiêu tiền": "how much",
+            "cái này bao nhiêu": "how much is this",
+            "giúp tôi": "help",
+            "tôi cần giúp đỡ": "i need help",
+            "nhà vệ sinh ở đâu": "where is the bathroom",
+            "ngon": "delicious",
+            "ngon quá": "delicious",
+            "tính tiền": "check please",
+            "cho tôi": "give me",
+            "nước": "water",
+        }
+        
+        # Reverse mappings for Korean and Vietnamese to English
+        self._ko_to_en = {}
+        self._vi_to_en = {}
+        for eng_phrase, translations in self._translations.items():
+            if "ko" in translations:
+                self._ko_to_en[translations["ko"].lower()] = eng_phrase
+            if "vi" in translations:
+                self._vi_to_en[translations["vi"].lower()] = eng_phrase
+    
+    def _normalize_text(self, text: str) -> str:
+        """Normalize text for matching."""
+        return text.lower().strip().rstrip('?!.,')
+    
+    def _find_translation(
+        self, text: str, source_lang: str, target_lang: str
+    ) -> Optional[str]:
+        """Find translation in dictionary."""
+        normalized = self._normalize_text(text)
+        
+        if source_lang == "en":
+            # English to Korean/Vietnamese
+            if normalized in self._translations:
+                return self._translations[normalized].get(target_lang)
+        elif source_lang == "ko":
+            # First check additional Korean phrases
+            if normalized in self._korean_phrases:
+                eng_phrase = self._korean_phrases[normalized]
+                if target_lang == "en":
+                    return self._translations.get(eng_phrase, {}).get("en", eng_phrase.title())
+                else:
+                    return self._translations.get(eng_phrase, {}).get(target_lang)
+            # Then check reverse mapping
+            if normalized in self._ko_to_en:
+                eng_phrase = self._ko_to_en[normalized]
+                if target_lang == "en":
+                    return self._translations[eng_phrase]["en"]
+                else:
+                    return self._translations[eng_phrase].get(target_lang)
+        elif source_lang == "vi":
+            # First check additional Vietnamese phrases
+            if normalized in self._vietnamese_phrases:
+                eng_phrase = self._vietnamese_phrases[normalized]
+                if target_lang == "en":
+                    return self._translations.get(eng_phrase, {}).get("en", eng_phrase.title())
+                else:
+                    return self._translations.get(eng_phrase, {}).get(target_lang)
+            # Then check reverse mapping
+            if normalized in self._vi_to_en:
+                eng_phrase = self._vi_to_en[normalized]
+                if target_lang == "en":
+                    return self._translations[eng_phrase]["en"]
+                else:
+                    return self._translations[eng_phrase].get(target_lang)
+        
+        return None
     
     async def translate(
         self, 
@@ -70,99 +265,95 @@ class MockTranslationModel(BaseTranslationModel):
         target_language: str, 
         source_language: Optional[str] = None
     ) -> dict:
-        """Mock translation implementation"""
+        """Translate text with improved accuracy for EN/KO/VI."""
         self._translation_count += 1
         
-        # Simulate variable processing time based on text length
-        processing_time = min(0.1, len(text) / 1000)
-        await asyncio.sleep(processing_time)
+        # Simulate small processing time
+        await asyncio.sleep(0.01)
         
-        # Simulate occasional failures for testing error handling
-        if self._translation_count % 50 == 0:  # Fail every 50th translation
-            raise TranslationFailureError("Mock translation service temporarily unavailable")
-        
-        # Mock translation logic - in real implementation, this would call actual translation API
-        if target_language == source_language:
-            translated_text = text  # No translation needed
-            confidence = 1.0
-        else:
-            translated_text = f"[{target_language.upper()}] {text}"
-            confidence = 0.95
-        
+        # Detect source language if not provided
         detected_source = source_language or await self.detect_language(text)
         
+        # Same language - no translation needed
+        if target_language == detected_source:
+            return {
+                "translated_text": text,
+                "source_language": detected_source,
+                "confidence": 1.0
+            }
+        
+        # Try dictionary lookup first
+        translation = self._find_translation(text, detected_source, target_language)
+        
+        if translation:
+            return {
+                "translated_text": translation,
+                "source_language": detected_source,
+                "confidence": 0.98
+            }
+        
+        # Fallback: Try partial matching for longer phrases
+        normalized = self._normalize_text(text)
+        words = normalized.split()
+        
+        # Try to translate word by word for simple phrases
+        if len(words) <= 5:
+            translated_words = []
+            found_any = False
+            for word in words:
+                word_trans = self._find_translation(word, detected_source, target_language)
+                if word_trans:
+                    translated_words.append(word_trans)
+                    found_any = True
+                else:
+                    translated_words.append(word)
+            
+            if found_any:
+                return {
+                    "translated_text": " ".join(translated_words),
+                    "source_language": detected_source,
+                    "confidence": 0.75
+                }
+        
+        # Final fallback - indicate translation not available
+        lang_names = {"en": "English", "ko": "Korean", "vi": "Vietnamese"}
         return {
-            "translated_text": translated_text,
+            "translated_text": f"[{lang_names.get(target_language, target_language)}] {text}",
             "source_language": detected_source,
-            "confidence": confidence
+            "confidence": 0.5
         }
     
     async def detect_language(self, text: str) -> str:
-        """Mock language detection"""
+        """Detect language with improved accuracy for EN/KO/VI."""
         self._detection_count += 1
-        
-        # Simulate processing time
-        await asyncio.sleep(0.02)
         
         if not text or not text.strip():
             return "en"
         
-        # Simple mock detection based on common words and patterns
-        text_lower = text.lower()
-        
-        # English indicators
-        if any(word in text_lower for word in ["the", "and", "is", "are", "this", "that", "with", "have"]):
-            return "en"
-        
-        # Spanish indicators
-        elif any(word in text_lower for word in ["el", "la", "es", "son", "este", "con", "de", "en"]):
-            return "es"
-        
-        # French indicators
-        elif any(word in text_lower for word in ["le", "la", "est", "sont", "ce", "avec", "de", "dans"]):
-            return "fr"
-        
-        # German indicators
-        elif any(word in text_lower for word in ["der", "die", "das", "ist", "sind", "mit", "von", "in"]):
-            return "de"
-        
-        # Italian indicators
-        elif any(word in text_lower for word in ["il", "la", "è", "sono", "questo", "con", "di", "in"]):
-            return "it"
-        
-        # Portuguese indicators
-        elif any(word in text_lower for word in ["o", "a", "é", "são", "este", "com", "de", "em"]):
-            return "pt"
-        
-        # Chinese indicators (simplified check for Chinese characters)
-        elif any('\u4e00' <= char <= '\u9fff' for char in text):
-            return "zh"
-        
-        # Japanese indicators (hiragana, katakana, kanji)
-        elif any('\u3040' <= char <= '\u309f' or '\u30a0' <= char <= '\u30ff' or '\u4e00' <= char <= '\u9fff' for char in text):
-            return "ja"
-        
-        # Korean indicators (Hangul)
-        elif any('\uac00' <= char <= '\ud7af' for char in text):
+        # Check for Korean (Hangul) - highest priority for Korean characters
+        korean_count = sum(1 for char in text if '\uac00' <= char <= '\ud7af' or '\u1100' <= char <= '\u11ff')
+        if korean_count > 0:
             return "ko"
         
-        else:
-            return "en"  # Default to English
+        # Check for Vietnamese (special diacritics)
+        vietnamese_chars = set('ăâđêôơưàảãáạằẳẵắặầẩẫấậèẻẽéẹềểễếệìỉĩíịòỏõóọồổỗốộờởỡớợùủũúụừửữứựỳỷỹýỵĂÂĐÊÔƠƯÀẢÃÁẠẰẲẴẮẶẦẨẪẤẬÈẺẼÉẸỀỂỄẾỆÌỈĨÍỊÒỎÕÓỌỒỔỖỐỘỜỞỠỚỢÙỦŨÚỤỪỬỮỨỰỲỶỸÝỴ')
+        if any(char in vietnamese_chars for char in text):
+            return "vi"
+        
+        # Default to English for Latin alphabet
+        return "en"
     
     async def health_check(self) -> bool:
-        """Mock health check"""
-        # Simulate occasional health check failures
-        import random
-        if random.random() < 0.05:  # 5% chance of failure
-            return False
+        """Health check always returns True for this implementation."""
         return True
     
     def get_stats(self) -> dict:
-        """Get mock model statistics"""
+        """Get translation statistics."""
         return {
             "translations_performed": self._translation_count,
             "language_detections_performed": self._detection_count,
-            "supported_languages": list(self._supported_languages)
+            "supported_languages": list(self._supported_languages),
+            "dictionary_size": len(self._translations)
         }
 
 

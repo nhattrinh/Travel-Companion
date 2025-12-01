@@ -6,8 +6,8 @@ import Combine
 struct CameraView: View {
     @StateObject private var viewModel = TranslationViewModel()
     @StateObject private var cameraManager = CameraManager()
-    @State private var showingSettings = false
     @State private var selectedSegment: TranslationSegment?
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         GeometryReader { geometry in
@@ -93,26 +93,20 @@ struct CameraView: View {
                 
                 // Controls overlay - always show top bar, conditionally show bottom controls
                 VStack {
-                    // Top bar - always visible
+                    // Top bar - close button only
                     HStack {
-                        Text(viewModel.detectedLanguage?.uppercased() ?? "---")
-                            .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(8)
-                        
-                        Spacer()
-                        
                         Button {
-                            showingSettings = true
+                            dismiss()
                         } label: {
-                            Image(systemName: "gearshape.fill")
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
                                 .padding(12)
                                 .background(.ultraThinMaterial)
                                 .clipShape(Circle())
                         }
+                        
+                        Spacer()
                     }
                     .padding()
                     
@@ -194,9 +188,6 @@ struct CameraView: View {
         }
         .sheet(item: $selectedSegment) { segment in
             SegmentDetailSheet(segment: segment, viewModel: viewModel)
-        }
-        .sheet(isPresented: $showingSettings) {
-            SettingsView()
         }
         .task {
             await viewModel.requestCameraPermission()
@@ -372,7 +363,7 @@ final class CameraManager: NSObject, ObservableObject {
 }
 
 extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+    nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
@@ -381,8 +372,8 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
         let image = UIImage(cgImage: cgImage)
         
-        Task { @MainActor in
-            self.currentFrame = image
+        Task { @MainActor [weak self] in
+            self?.currentFrame = image
         }
     }
 }

@@ -2,35 +2,53 @@ import Foundation
 import CoreLocation
 import Combine
 import Network
+import UIKit
 
 @MainActor
 final class NavigationViewModel: ObservableObject {
-    @Published var pois: [POI] = []
+    // MARK: - Published Properties
     @Published var userLocation: CLLocationCoordinate2D?
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var selectedPOI: POI?
     @Published var isOffline = false
     
-    private let apiClient: APIClient
-    private let authService: AuthService
+    // Search state
+    @Published var destinationQuery: String = ""
+    
+    // Directions state
+    @Published var currentRoute: WalkingRoute?
+    @Published var isLoadingDirections = false
+    @Published var directionsError: String?
+    
+    // Drawer state
+    @Published var showDirectionsDrawer = false
+    @Published var drawerHeight: DrawerHeight = .collapsed
+    
+    // MARK: - Private Properties
+    private let directionsService: DirectionsService
     private let locationManager = LocationManager()
     private let networkMonitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "NetworkMonitor")
     private var cancellables = Set<AnyCancellable>()
     
-    init(apiClient: APIClient = .shared, authService: AuthService = .shared) {
-        self.apiClient = apiClient
-        self.authService = authService
-        setupLocationUpdates()
-        setupNetworkMonitoring()
+    // MARK: - Initialization
+    nonisolated init(directionsService: DirectionsService = DirectionsService.shared) {
+        self.directionsService = directionsService
+        // Setup must be done on MainActor
+        Task { @MainActor [weak self] in
+            self?.setupLocationUpdates()
+            self?.setupNetworkMonitoring()
+        }
     }
     
+    // MARK: - Setup Methods
     private func setupLocationUpdates() {
         locationManager.$currentLocation
             .compactMap { $0 }
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] location in
-                self?.userLocation = location.coordinate
+                guard let self else { return }
+                self.userLocation = location.coordinate
             }
             .store(in: &cancellables)
     }
@@ -44,58 +62,72 @@ final class NavigationViewModel: ObservableObject {
         networkMonitor.start(queue: monitorQueue)
     }
     
+    // MARK: - Location Methods
     func requestLocationPermission() async {
         await locationManager.requestPermission()
     }
     
-    func fetchNearbyPOIs(radiusMeters: Int = 1000) async {
+    // MARK: - Directions Methods
+    
+    /// Get walking directions from current location to destination
+    func getDirections() async {
+        guard !destinationQuery.isEmpty else {
+            directionsError = "Please enter a destination"
+            return
+        }
+        
         guard !isOffline else {
-            errorMessage = "You are offline. POI search unavailable."
+            directionsError = "You are offline. Directions unavailable."
             return
         }
         
-        guard let location = userLocation else {
-            errorMessage = "Location not available. Please enable location services."
-            return
+        // Use current location or a placeholder
+        let startLocation: String
+        if let location = userLocation {
+            // Use coordinates as start location
+            startLocation = "Current location (\(String(format: "%.4f", location.latitude)), \(String(format: "%.4f", location.longitude)))"
+        } else {
+            startLocation = "Current location"
         }
         
-        isLoading = true
-        errorMessage = nil
+        isLoadingDirections = true
+        directionsError = nil
         
         do {
-            let token = try await authService.getAccessToken()
-            
-            let response = try await apiClient.fetchPOIs(
-                latitude: location.latitude,
-                longitude: location.longitude,
-                radiusMeters: radiusMeters,
-                token: token
+            let route = try await directionsService.getWalkingDirections(
+                from: startLocation,
+                to: destinationQuery
             )
-            
-            guard response.status == "ok", let data = response.data else {
-                throw NavigationError.apiError(response.error ?? "Unknown error")
-            }
-            
-            pois = data.pois.map { $0.toPOI() }
-            
+            currentRoute = route
+            showDirectionsDrawer = true
+            drawerHeight = .partial
         } catch {
-            errorMessage = error.localizedDescription
-            pois = []
+            directionsError = error.localizedDescription
+            currentRoute = nil
         }
         
-        isLoading = false
+        isLoadingDirections = false
     }
     
-    func selectPOI(_ poi: POI) {
-        selectedPOI = poi
+    /// Clear current route and hide drawer
+    func clearRoute() {
+        currentRoute = nil
+        showDirectionsDrawer = false
+        drawerHeight = .collapsed
+        destinationQuery = ""
+        directionsError = nil
     }
     
-    func clearSelection() {
-        selectedPOI = nil
-    }
-    
-    func refresh() async {
-        await fetchNearbyPOIs()
+    /// Toggle drawer between collapsed and expanded
+    func toggleDrawer() {
+        switch drawerHeight {
+        case .collapsed:
+            drawerHeight = .partial
+        case .partial:
+            drawerHeight = .expanded
+        case .expanded:
+            drawerHeight = .partial
+        }
     }
     
     deinit {
@@ -103,6 +135,23 @@ final class NavigationViewModel: ObservableObject {
     }
 }
 
+// MARK: - Drawer Height Enum
+enum DrawerHeight: Equatable {
+    case collapsed
+    case partial
+    case expanded
+    
+    var height: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        switch self {
+        case .collapsed: return 0
+        case .partial: return 300
+        case .expanded: return screenHeight * 0.75
+        }
+    }
+}
+
+// MARK: - Location Manager
 @MainActor
 final class LocationManager: NSObject, ObservableObject {
     @Published var currentLocation: CLLocation?
@@ -155,6 +204,7 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 }
 
+// MARK: - Navigation Errors
 enum NavigationError: LocalizedError {
     case unauthorized
     case apiError(String)

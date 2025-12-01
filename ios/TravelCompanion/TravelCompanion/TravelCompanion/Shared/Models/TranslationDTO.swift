@@ -88,3 +88,18 @@ struct SavedTranslationData: Codable {
     let translatedText: String
     let timestamp: String
 }
+
+/// Text translation response
+struct TextTranslationResponse: Codable {
+    let status: String
+    let data: TextTranslationData?
+    let error: String?
+}
+
+struct TextTranslationData: Codable {
+    let originalText: String
+    let translatedText: String
+    let sourceLanguage: String
+    let targetLanguage: String
+    let confidence: Double
+}

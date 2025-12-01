@@ -61,3 +61,6 @@ easyocr>=1.7.0
 
 # Numerical computing
 numpy>=1.24.0
+
+# OpenAI API for AI-powered features
+openai>=1.0.0

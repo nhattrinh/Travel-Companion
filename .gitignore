@@ -138,5 +138,6 @@ exports/
 *~
 
 venv/
+.env
 
 # End of file
