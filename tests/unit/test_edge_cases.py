@@ -63,9 +63,9 @@ class TestLanguageCodeValidation:
     def test_valid_language_codes(self):
         """Valid ISO 639-1 codes should pass."""
         assert validate_language_code("en") == "en"
-        assert validate_language_code("ja") == "ja"
-        assert validate_language_code("ES") == "es"  # Lowercase conversion
-        assert validate_language_code("zh-CN") == "zh-cn"  # Extended format
+        assert validate_language_code("ko") == "ko"
+        assert validate_language_code("VI") == "vi"  # Lowercase conversion
+        assert validate_language_code("ko-KR") == "ko-kr"  # Extended format
     
     def test_invalid_language_codes(self):
         """Invalid language codes should raise ValidationError."""

@@ -62,7 +62,7 @@ struct SegmentDetailSheet: View {
     @State private var showingSaveConfirmation = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 24) {
                 // Confidence indicator
                 HStack {

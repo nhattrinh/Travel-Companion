@@ -235,6 +235,8 @@ struct DirectionSegmentRow: View {
     let waypoints: [Waypoint]
     
     @State private var isExpanded = false
+    @State private var imageUrls: [URL] = []
+    @State private var isLoadingImages = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -242,6 +244,10 @@ struct DirectionSegmentRow: View {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isExpanded.toggle()
+                }
+                // Load images when first expanded
+                if isExpanded && imageUrls.isEmpty && !isLoadingImages {
+                    loadImages()
                 }
             } label: {
                 HStack(alignment: .top, spacing: 12) {
@@ -313,17 +319,114 @@ struct DirectionSegmentRow: View {
                             .foregroundColor(.green)
                             .font(.caption)
                         
-                        Text("Checkpoint: \(segment.checkpoint.name)")
+                        Text("Arrived: \(segment.checkpoint.name)")
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.green)
                     }
                     .padding(.top, 4)
+                    
+                    // Landmark hint to help identify the checkpoint
+                    if let hint = segment.checkpoint.landmarkHint, !hint.isEmpty {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "eye.fill")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            
+                            Text(hint)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .italic()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, 4)
+                    }
+                    
+                    // Image carousel for checkpoint
+                    if isLoadingImages {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading images...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 8)
+                    } else if !imageUrls.isEmpty {
+                        checkpointImageCarousel
+                    }
                 }
                 .padding(.leading, 44)
                 .padding(.trailing)
                 .padding(.bottom, 12)
                 .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+    
+    // MARK: - Image Carousel
+    private var checkpointImageCarousel: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: "photo.stack")
+                    .foregroundColor(.blue)
+                    .font(.caption)
+                Text("Location Preview")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(imageUrls.prefix(3), id: \.absoluteString) { url in
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.gray.opacity(0.2))
+                                    .frame(width: 120, height: 80)
+                                    .overlay(ProgressView().scaleEffect(0.6))
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 120, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            case .failure:
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.gray.opacity(0.2))
+                                    .frame(width: 120, height: 80)
+                                    .overlay(
+                                        Image(systemName: "photo")
+                                            .foregroundColor(.gray)
+                                    )
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.top, 8)
+    }
+    
+    // MARK: - Load Images
+    private func loadImages() {
+        isLoadingImages = true
+        Task {
+            do {
+                let urls = try await ImageSearchService.shared.searchImages(query: segment.checkpoint.name)
+                await MainActor.run {
+                    imageUrls = urls
+                    isLoadingImages = false
+                }
+            } catch {
+                print("Failed to load images: \(error)")
+                await MainActor.run {
+                    isLoadingImages = false
+                }
             }
         }
     }
@@ -339,7 +442,7 @@ struct DirectionSegmentRow: View {
                 startLocationQuery: "Tokyo Skytree",
                 endLocationQuery: "Tokyo Tower",
                 notes: "This is a scenic route through central Tokyo.",
-                totalDistanceKm: 8.5,
+                totalDistanceMi: 5.3,
                 estimatedDurationMin: 105,
                 safetyNote: "This is a long walk. Consider bringing water and checking the weather.",
                 waypoints: [
@@ -353,7 +456,7 @@ struct DirectionSegmentRow: View {
                         fromId: "start",
                         toId: "w1",
                         summary: "Walk from Tokyo Skytree to Senso-ji Temple",
-                        distanceEstimateKm: 1.2,
+                        distanceEstimateMi: 0.75,
                         estimatedDurationMin: 15,
                         steps: [
                             "Exit Tokyo Skytree and head west",
@@ -361,7 +464,12 @@ struct DirectionSegmentRow: View {
                             "Continue straight for 800 meters",
                             "You will see Senso-ji Temple on your right"
                         ],
-                        checkpoint: Checkpoint(name: "Senso-ji Temple", lat: 35.7148, lng: 139.7967)
+                        checkpoint: Checkpoint(
+                            name: "Senso-ji Temple",
+                            lat: 35.7148,
+                            lng: 139.7967,
+                            landmarkHint: "Look for the iconic red Kaminarimon gate with its giant paper lantern"
+                        )
                     )
                 ]
             ),

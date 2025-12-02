@@ -51,17 +51,34 @@ final class TranslationViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            // Encode image to base64
-            guard let base64Image = ImageEncoding.encodeToBase64WithSizeLimit(image, maxSizeBytes: 2_097_152) else {
+            // Compress image to JPEG with error handling
+            guard let imageData = autoreleasepool(invoking: {
+                image.jpegData(compressionQuality: 0.7)
+            }) else {
                 throw TranslationError.imageEncodingFailed
+            }
+            
+            // Limit size to 2MB
+            let maxSize = 2_097_152
+            let finalData: Data
+            if imageData.count > maxSize {
+                // Try with lower quality
+                guard let compressedData = autoreleasepool(invoking: {
+                    image.jpegData(compressionQuality: 0.4)
+                }), compressedData.count <= maxSize else {
+                    throw TranslationError.imageEncodingFailed
+                }
+                finalData = compressedData
+            } else {
+                finalData = imageData
             }
             
             // Get auth token
             let token = try await authService.getAccessToken()
             
-            // Call live-frame endpoint
+            // Call live-frame endpoint with multipart form data
             let response = try await apiClient.postTranslationFrame(
-                imageBase64: base64Image,
+                imageData: finalData,
                 targetLanguage: targetLanguage,
                 token: token
             )

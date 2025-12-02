@@ -32,17 +32,17 @@ async def test_filter_translations_by_trip(db_session, test_user):
         user_id=test_user.id,
         trip_id=trip1.id,
         source_text="Hello from trip 1",
-        target_text="こんにちは",
+        target_text="안녕하세요",
         source_language="en",
-        target_language="ja"
+        target_language="ko"
     )
     trans2 = Translation(
         user_id=test_user.id,
         trip_id=trip1.id,
         source_text="Goodbye from trip 1",
-        target_text="さようなら",
+        target_text="안녕히 가세요",
         source_language="en",
-        target_language="ja"
+        target_language="ko"
     )
     
     # Create translation for trip2
@@ -50,9 +50,9 @@ async def test_filter_translations_by_trip(db_session, test_user):
         user_id=test_user.id,
         trip_id=trip2.id,
         source_text="Hello from trip 2",
-        target_text="你好",
+        target_text="Xin chào",
         source_language="en",
-        target_language="zh"
+        target_language="vi"
     )
     
     db_session.add_all([trans1, trans2, trans3])
@@ -82,9 +82,9 @@ async def test_translations_without_trip(db_session, test_user):
         user_id=test_user.id,
         trip_id=None,
         source_text="No trip translation",
-        target_text="旅行なし",
+        target_text="여행 없음",
         source_language="en",
-        target_language="ja"
+        target_language="ko"
     )
     db_session.add(trans)
     await db_session.commit()
@@ -113,9 +113,9 @@ async def test_translation_cascade_delete_on_trip_deletion(db_session, test_user
         user_id=test_user.id,
         trip_id=trip.id,
         source_text="Will be deleted",
-        target_text="削除される",
+        target_text="삭제될 것",
         source_language="en",
-        target_language="ja"
+        target_language="ko"
     )
     db_session.add(trans)
     await db_session.commit()

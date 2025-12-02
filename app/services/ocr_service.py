@@ -7,10 +7,17 @@ with confidence scores, spatial layout preservation, and image preprocessing.
 
 import asyncio
 import logging
+import os
+import base64
+import json
 from typing import List, Dict, Tuple, Optional, Union
 from PIL import Image
+import io
 import time
 from abc import ABC, abstractmethod
+
+from google import genai
+from google.genai import types
 
 from ..models.internal_models import OCRResult, ProcessingStage, ErrorCode
 from .image_processor import ImageProcessor, ImageValidationError
@@ -33,6 +40,134 @@ class BaseOCRModel(ABC):
     async def health_check(self) -> bool:
         """Check if OCR model is healthy and ready"""
         pass
+
+
+class GeminiVisionOCRModel(BaseOCRModel):
+    """Google Gemini Vision-based OCR model for menu text extraction"""
+    
+    def __init__(self, target_language: str = "en"):
+        self.logger = logging.getLogger(__name__)
+        self.api_key = os.getenv("GOOGLE_API_KEY")
+        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
+        self.target_language = target_language
+        
+    async def extract_text_from_image(self, image: Image.Image) -> List[OCRResult]:
+        """Extract text from image using Google Gemini Vision API"""
+        if not self.client:
+            self.logger.warning("No GOOGLE_API_KEY, falling back to mock")
+            return await MockOCRModel().extract_text_from_image(image)
+        
+        try:
+            # Convert PIL Image to bytes
+            buffered = io.BytesIO()
+            image.save(buffered, format="JPEG", quality=85)
+            image_bytes = buffered.getvalue()
+            
+            lang_name = {
+                "en": "English", "vi": "Vietnamese", "ko": "Korean"
+            }.get(self.target_language, "English")
+            
+            prompt = f"""You are a menu OCR and translation assistant.
+Analyze this menu image and extract ALL food/drink items.
+
+Return a JSON array where each item has:
+- text: original text exactly as shown on menu
+- translated: {lang_name} translation of the food name
+- item_type: "food" for food/drink, "price" for standalone prices
+- confidence: 0.0-1.0 based on text clarity
+- y_position: vertical position (0=top, 100=bottom)
+- price: the price if visible near this item (e.g., "₩6,000")
+- image_url: a real, working image URL of this food dish from the web (use Wikipedia Commons, Korean food sites, or well-known food image sources)
+
+IMPORTANT for image_url:
+- Provide actual working URLs to images of the specific dish
+- For Korean dishes, use URLs from Korean food sites or Wikipedia
+- Example: "https://upload.wikimedia.org/wikipedia/commons/thumb/..." 
+- If you cannot find a specific image URL, use null
+
+Rules:
+- Translate food names accurately to {lang_name}
+- Keep prices in original format (₩, $, etc.)
+- Skip standalone price-only items (item_type="price")
+- Return ONLY valid JSON array, no markdown or explanation."""
+
+            # Call Gemini Vision API (run sync in thread pool to avoid SSL issues)
+            response = await asyncio.to_thread(
+                self.client.models.generate_content,
+                model='gemini-2.0-flash',
+                contents=[
+                    prompt,
+                    types.Part.from_bytes(
+                        data=image_bytes,
+                        mime_type='image/jpeg'
+                    )
+                ]
+            )
+            
+            # Parse response
+            content = response.text
+            self.logger.info(f"Gemini response: {content[:500]}...")
+            
+            # Clean up response - remove markdown code blocks if present
+            content = content.strip()
+            if content.startswith("```"):
+                lines = content.split("\n")
+                # Remove first and last lines (```json and ```)
+                content = "\n".join(lines[1:-1])
+            content = content.strip()
+            
+            # Parse JSON
+            items = json.loads(content)
+            
+            # Convert to OCRResult objects
+            results = []
+            img_height = image.height
+            img_width = image.width
+            
+            for i, item in enumerate(items):
+                if isinstance(item, dict) and "text" in item:
+                    text = item.get("text", "")
+                    translated = item.get("translated", text)
+                    item_type = item.get("item_type", "food")
+                    price = item.get("price")
+                    image_url = item.get("image_url")
+                    confidence = float(item.get("confidence", 0.8))
+                    y_pos = float(item.get("y_position", i * 10))
+                    
+                    # Skip standalone price items
+                    if item_type == "price":
+                        continue
+                    
+                    # Calculate bounding box based on y_position
+                    y1 = int((y_pos / 100) * img_height)
+                    y2 = min(y1 + 30, img_height)
+                    x1 = 50
+                    x2 = img_width - 50
+                    
+                    results.append(OCRResult(
+                        text=text,
+                        confidence=confidence,
+                        bbox=(x1, y1, x2, y2),
+                        group_id=f"menu_item_{i}",
+                        translated_text=translated,
+                        item_type=item_type,
+                        price=price,
+                        image_url=image_url
+                    ))
+            
+            self.logger.info(f"Extracted {len(results)} food items with Gemini")
+            return results
+            
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse Gemini response as JSON: {e}")
+            return []
+        except Exception as e:
+            self.logger.error(f"Gemini Vision OCR failed: {e}")
+            raise OCRProcessingError(f"Vision OCR failed: {str(e)}")
+    
+    async def health_check(self) -> bool:
+        """Check if Gemini API is accessible"""
+        return self.client is not None
 
 
 class MockOCRModel(BaseOCRModel):
@@ -108,7 +243,13 @@ class OCRService:
     
     def __init__(self, ocr_model: Optional[BaseOCRModel] = None):
         """Initialize OCR service with optional model"""
-        self.ocr_model = ocr_model or MockOCRModel()
+        # Use OpenAI Vision model by default if API key is available
+        if ocr_model:
+            self.ocr_model = ocr_model
+        elif os.getenv("OPENAI_API_KEY"):
+            self.ocr_model = OpenAIVisionOCRModel()
+        else:
+            self.ocr_model = MockOCRModel()
         self.image_processor = ImageProcessor()
         self.logger = logging.getLogger(__name__)
         self.confidence_threshold = self.DEFAULT_CONFIDENCE_THRESHOLD

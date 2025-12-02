@@ -31,22 +31,11 @@ from .ml_models.translation_models import (
 logger = logging.getLogger(__name__)
 
 
-# ISO 639-1 to TranslationLanguage mapping
+# ISO 639-1 to TranslationLanguage mapping (only supported languages)
 ISO_TO_LANG = {
     "en": TranslationLanguage.ENGLISH,
-    "ja": TranslationLanguage.JAPANESE,
-    "es": TranslationLanguage.SPANISH,
     "vi": TranslationLanguage.VIETNAMESE,
-    "fr": TranslationLanguage.FRENCH,
-    "de": TranslationLanguage.GERMAN,
-    "it": TranslationLanguage.ITALIAN,
-    "pt": TranslationLanguage.PORTUGUESE,
-    "zh": TranslationLanguage.CHINESE_SIMPLIFIED,
     "ko": TranslationLanguage.KOREAN,
-    "th": TranslationLanguage.THAI,
-    "ar": TranslationLanguage.ARABIC,
-    "hi": TranslationLanguage.HINDI,
-    "ru": TranslationLanguage.RUSSIAN,
 }
 
 

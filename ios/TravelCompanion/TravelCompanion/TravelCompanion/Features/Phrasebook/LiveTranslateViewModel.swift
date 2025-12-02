@@ -59,7 +59,11 @@ final class LiveTranslateViewModel: ObservableObject {
     
     func stopListening() {
         audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        do {
+            audioEngine.inputNode.removeTap(onBus: 0)
+        } catch {
+            // Ignore errors when removing tap - it may not exist
+        }
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionTask = nil
@@ -117,7 +121,13 @@ final class LiveTranslateViewModel: ObservableObject {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            errorMessage = "Failed to configure audio session"
+            errorMessage = "Failed to configure audio session: \(error.localizedDescription)"
+            return
+        }
+        
+        // Check if audio input is available (microphone connected)
+        guard audioSession.isInputAvailable else {
+            errorMessage = "No microphone available. Please connect a microphone or open your laptop lid."
             return
         }
         
@@ -131,8 +141,26 @@ final class LiveTranslateViewModel: ObservableObject {
         recognitionRequest.shouldReportPartialResults = true
         recognitionRequest.addsPunctuation = true
         
-        // Get input node
-        let inputNode = audioEngine.inputNode
+        // Get input node - wrap in do-catch to handle hardware unavailable
+        let inputNode: AVAudioInputNode
+        do {
+            // Accessing inputNode can throw if no audio input hardware is available
+            inputNode = audioEngine.inputNode
+            
+            // Check if the input node has valid format
+            let recordingFormat = inputNode.outputFormat(forBus: 0)
+            guard recordingFormat.sampleRate > 0 && recordingFormat.channelCount > 0 else {
+                errorMessage = "No valid audio input format. Please check your microphone."
+                return
+            }
+            
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+                recognitionRequest.append(buffer)
+            }
+        } catch {
+            errorMessage = "Failed to access microphone: \(error.localizedDescription)"
+            return
+        }
         
         // Start recognition task
         recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
@@ -167,12 +195,6 @@ final class LiveTranslateViewModel: ObservableObject {
             }
         }
         
-        // Configure audio input
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            recognitionRequest.append(buffer)
-        }
-        
         // Start audio engine
         do {
             audioEngine.prepare()
@@ -180,7 +202,9 @@ final class LiveTranslateViewModel: ObservableObject {
             isListening = true
             errorMessage = nil
         } catch {
-            errorMessage = "Failed to start audio engine"
+            // Clean up the tap we installed if engine fails to start
+            inputNode.removeTap(onBus: 0)
+            errorMessage = "Failed to start audio engine: \(error.localizedDescription)"
         }
     }
     
@@ -235,7 +259,11 @@ final class LiveTranslateViewModel: ObservableObject {
     private func restartRecognition() {
         // Stop current recognition
         audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        do {
+            audioEngine.inputNode.removeTap(onBus: 0)
+        } catch {
+            // Ignore errors when removing tap - it may not exist
+        }
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         

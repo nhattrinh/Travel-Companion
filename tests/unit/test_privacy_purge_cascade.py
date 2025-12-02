@@ -40,17 +40,17 @@ def _seed(session, user_id: int):
     session.add(
         Translation(
             user_id=user_id,
-            source_text="hola",
-            target_text="hello",
-            source_language="es",
-            target_language="en",
+            source_text="hello",
+            target_text="xin chào",
+            source_language="en",
+            target_language="vi",
         )
     )
     session.add(Favorite(user_id=user_id, target_type="phrase", target_id=1))
     session.add(
         Trip(
             user_id=user_id,
-            destination="Tokyo",
+            destination="Seoul",
             start_date="2025-11-01",
         )
     )

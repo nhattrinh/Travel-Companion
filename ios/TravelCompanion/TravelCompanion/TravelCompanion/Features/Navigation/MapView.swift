@@ -162,6 +162,7 @@ struct MapView: View {
     // MARK: - Floating Controls
     private var floatingControls: some View {
         VStack {
+            Spacer()
             HStack {
                 Spacer()
                 VStack(spacing: 12) {
@@ -195,9 +196,8 @@ struct MapView: View {
                 }
                 .padding()
             }
-            Spacer()
         }
-        .padding(.top, 120) // Below search bar
+        .padding(.bottom, viewModel.showDirectionsDrawer ? viewModel.drawerHeight.height + 20 : 100)
     }
     
     // MARK: - Offline Banner

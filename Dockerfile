@@ -29,11 +29,9 @@ WORKDIR /build
 # Copy base requirements first for caching
 COPY requirements.txt .
 # Copy travel companion extra requirements
-COPY requirements-travel.txt ./
 
 # Install Python dependencies (base + optional travel companion extras)
-RUN pip install -r requirements.txt && \
-    if [ -f requirements-travel.txt ]; then pip install -r requirements-travel.txt; fi
+RUN pip install -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
@@ -86,7 +84,7 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Copy application code from builder stage
 COPY --from=builder --chown=appuser:appuser /build/app/ ./app/
-COPY --from=builder --chown=appuser:appuser /build/requirements-travel.txt* ./
+COPY --from=builder --chown=appuser:appuser /build/requirements.txt* ./
 COPY --from=builder --chown=appuser:appuser /build/.env.* ./
 COPY --from=builder --chown=appuser:appuser /build/run.py ./
 

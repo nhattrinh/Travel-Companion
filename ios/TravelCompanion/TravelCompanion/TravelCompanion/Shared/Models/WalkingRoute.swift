@@ -9,19 +9,19 @@ struct WalkingRoute: Codable, Identifiable {
     let startLocationQuery: String
     let endLocationQuery: String
     let notes: String
-    let totalDistanceKm: Double?
+    let totalDistanceMi: Double?
     let estimatedDurationMin: Double?
     let safetyNote: String
     let waypoints: [Waypoint]
     let directions: [DirectionSegment]
     
-    /// Get formatted total distance
+    /// Get formatted total distance in miles
     var totalDistanceFormatted: String {
-        guard let distance = totalDistanceKm else { return "Unknown" }
-        if distance < 1 {
-            return String(format: "%.0f m", distance * 1000)
+        guard let distance = totalDistanceMi else { return "Unknown" }
+        if distance < 0.1 {
+            return String(format: "%.0f ft", distance * 5280)
         }
-        return String(format: "%.1f km", distance)
+        return String(format: "%.1f mi", distance)
     }
     
     /// Get formatted total duration
@@ -99,18 +99,18 @@ struct DirectionSegment: Codable, Identifiable {
     let fromId: String
     let toId: String
     let summary: String
-    let distanceEstimateKm: Double?
+    let distanceEstimateMi: Double?
     let estimatedDurationMin: Double?
     let steps: [String]
     let checkpoint: Checkpoint
     
-    /// Get formatted distance for this segment
+    /// Get formatted distance for this segment in miles
     var distanceFormatted: String {
-        guard let distance = distanceEstimateKm else { return "" }
-        if distance < 1 {
-            return String(format: "%.0f m", distance * 1000)
+        guard let distance = distanceEstimateMi else { return "" }
+        if distance < 0.1 {
+            return String(format: "%.0f ft", distance * 5280)
         }
-        return String(format: "%.1f km", distance)
+        return String(format: "%.1f mi", distance)
     }
     
     /// Get formatted duration for this segment
@@ -125,9 +125,18 @@ struct Checkpoint: Codable {
     let name: String
     let lat: Double?
     let lng: Double?
+    let landmarkHint: String?  // Visual cue to identify this location
+    
+    // Images loaded separately via ImageSearchService
+    var imageUrls: [String]?
     
     var coordinate: CLLocationCoordinate2D? {
         guard let lat = lat, let lng = lng else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    }
+    
+    // Custom coding keys since imageUrls is set client-side
+    enum CodingKeys: String, CodingKey {
+        case name, lat, lng, landmarkHint
     }
 }

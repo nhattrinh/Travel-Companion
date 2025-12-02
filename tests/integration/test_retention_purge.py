@@ -96,9 +96,9 @@ async def test_purge_cascades_translations(db_session, test_user):
         user_id=test_user.id,
         trip_id=old_trip.id,
         source_text="Old translation",
-        target_text="古い翻訳",
+        target_text="오래된 번역",
         source_language="en",
-        target_language="ja"
+        target_language="ko"
     )
     db_session.add(trans)
     await db_session.commit()

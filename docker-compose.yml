@@ -22,6 +22,7 @@ services:
       - REDIS_DB=${REDIS_DB:-0}
       - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
       - API_KEYS=${API_KEYS:-dev-api-key}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
     volumes:
       # Mount app directory for hot-reload (changes auto-reload the server)
       - ./app:/app/app

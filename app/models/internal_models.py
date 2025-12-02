@@ -80,6 +80,10 @@ class OCRResult:
     bbox: tuple[int, int, int, int]  # (x1, y1, x2, y2)
     group_id: Optional[str] = None
     processing_time_ms: Optional[int] = None
+    translated_text: Optional[str] = None
+    item_type: Optional[str] = None  # "food" or "price"
+    price: Optional[str] = None  # Associated price for food items
+    image_url: Optional[str] = None  # URL to food image from Gemini
     
     def __post_init__(self):
         """Validate OCR result data"""

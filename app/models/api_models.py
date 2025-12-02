@@ -15,13 +15,7 @@ import uuid
 class SupportedLanguage(str, Enum):
     """Supported languages for translation (Requirements 8.1, 8.2)"""
     ENGLISH = "en"
-    SPANISH = "es"
-    FRENCH = "fr"
-    GERMAN = "de"
-    ITALIAN = "it"
-    PORTUGUESE = "pt"
-    CHINESE = "zh"
-    JAPANESE = "ja"
+    VIETNAMESE = "vn"
     KOREAN = "ko"
 
 

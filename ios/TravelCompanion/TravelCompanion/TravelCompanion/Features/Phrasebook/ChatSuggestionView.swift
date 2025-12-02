@@ -8,7 +8,7 @@ struct ChatSuggestionView: View {
     @State private var selectedPhrase: Phrase?
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Context header
                 contextHeader
@@ -219,7 +219,7 @@ struct PhraseDetailSheet: View {
     @State private var showCopiedFeedback = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 24) {
                 // Translation (large)
                 VStack(spacing: 12) {

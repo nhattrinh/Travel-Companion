@@ -52,19 +52,35 @@ final class APIClient {
         return try decoder.decode(Envelope<T>.self, from: data)
     }
     
-    /// POST translation frame for live camera translation
-    func postTranslationFrame(imageBase64: String, targetLanguage: String, token: String) async throws -> LiveFrameResponse {
+    /// POST translation frame for live camera translation (multipart form data)
+    func postTranslationFrame(imageData: Data, targetLanguage: String, token: String) async throws -> LiveFrameResponse {
         let url = AppEnvironment.translationBaseURL.appendingPathComponent("live-frame")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let body: [String: Any] = [
-            "image_base64": imageBase64,
-            "target_language": targetLanguage
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        // Create multipart form data
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        
+        // Add image file
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add target_language as query parameter instead
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        // Add target_language to URL
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
+        components.queryItems = [URLQueryItem(name: "target_language", value: targetLanguage)]
+        request.url = components.url
         
         let (data, response) = try await session.data(for: request)
         
@@ -73,6 +89,10 @@ final class APIClient {
         }
         
         guard httpResponse.statusCode == 200 else {
+            // Try to parse error message
+            if let errorResponse = try? JSONDecoder().decode(LiveFrameResponse.self, from: data) {
+                throw APIError.serverError(errorResponse.error ?? "Unknown error")
+            }
             throw APIError.httpError(httpResponse.statusCode)
         }
         
@@ -427,6 +447,7 @@ final class APIClient {
 enum APIError: LocalizedError {
     case invalidResponse
     case httpError(Int)
+    case serverError(String)
     
     var errorDescription: String? {
         switch self {
@@ -434,6 +455,8 @@ enum APIError: LocalizedError {
             return "Invalid server response"
         case .httpError(let code):
             return "HTTP error: \(code)"
+        case .serverError(let message):
+            return message
         }
     }
 }

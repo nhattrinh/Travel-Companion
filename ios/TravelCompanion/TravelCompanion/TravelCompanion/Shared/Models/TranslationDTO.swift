@@ -7,13 +7,28 @@ struct TranslationSegment: Codable, Identifiable {
     let translatedText: String
     let confidence: Double
     let boundingBox: BoundingBox
+    var itemType: String = "food"  // "food" or "price"
+    var price: String? = nil  // Associated price for food items
+    var photoURL: URL? = nil  // URL for food image
     
-    init(id: UUID = UUID(), originalText: String, translatedText: String, confidence: Double, boundingBox: BoundingBox) {
+    init(
+        id: UUID = UUID(),
+        originalText: String,
+        translatedText: String,
+        confidence: Double,
+        boundingBox: BoundingBox,
+        itemType: String = "food",
+        price: String? = nil,
+        photoURL: URL? = nil
+    ) {
         self.id = id
         self.originalText = originalText
         self.translatedText = translatedText
         self.confidence = confidence
         self.boundingBox = boundingBox
+        self.itemType = itemType
+        self.price = price
+        self.photoURL = photoURL
     }
 }
 
@@ -34,27 +49,53 @@ struct LiveFrameResponse: Codable {
 
 struct LiveFrameData: Codable {
     let segments: [TranslationSegmentDTO]
-    let detectedLanguage: String?
-    let processingTimeMs: Double?
+    let sourceLanguage: String?
+    let targetLanguage: String?
+    let latencyMs: Double?
+    
+    // Map backend field name
+    var detectedLanguage: String? { sourceLanguage }
+    var processingTimeMs: Double? { latencyMs }
 }
 
 struct TranslationSegmentDTO: Codable {
-    let originalText: String
-    let translatedText: String
+    // Backend field names
+    let text: String
+    let translated: String
     let confidence: Double
-    let boundingBox: BoundingBoxDTO
+    let x1: Int
+    let y1: Int
+    let x2: Int
+    let y2: Int
+    let itemType: String?
+    let price: String?
+    let photoUrl: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case text, translated, confidence, x1, y1, x2, y2
+        case itemType = "item_type"
+        case price
+        case photoUrl = "photo_url"
+    }
     
     func toSegment() -> TranslationSegment {
-        TranslationSegment(
-            originalText: originalText,
-            translatedText: translatedText,
+        // Calculate width and height from coordinates
+        let width = Double(x2 - x1)
+        let height = Double(y2 - y1)
+        
+        return TranslationSegment(
+            originalText: text,
+            translatedText: translated,
             confidence: confidence,
             boundingBox: BoundingBox(
-                x: boundingBox.x,
-                y: boundingBox.y,
-                width: boundingBox.width,
-                height: boundingBox.height
-            )
+                x: Double(x1),
+                y: Double(y1),
+                width: width,
+                height: height
+            ),
+            itemType: itemType ?? "food",
+            price: price,
+            photoURL: photoUrl.flatMap { URL(string: $0) }
         )
     }
 }

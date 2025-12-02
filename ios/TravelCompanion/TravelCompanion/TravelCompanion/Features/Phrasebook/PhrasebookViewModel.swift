@@ -27,9 +27,8 @@ final class PhrasebookViewModel: ObservableObject {
     
     let availableLanguages = [
         ("en", "English"),
-        ("ja", "Japanese"),
-        ("es", "Spanish"),
-        ("fr", "French")
+        ("ko", "Korean"),
+        ("vi", "Vietnamese")
     ]
     
     init(apiClient: APIClient = .shared, authService: AuthService = .shared) {

@@ -8,8 +8,8 @@ struct SettingsView: View {
     @State private var showingDeleteAccountConfirmation = false
     
     var body: some View {
-        NavigationView {
-            List {
+        NavigationStack {
+            Form {
                 // User Profile Section
                 Section {
                     HStack {
@@ -137,33 +137,31 @@ struct SettingsView: View {
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @Published var defaultLanguage: String = "ja"
+    @Published var defaultLanguage: String = "en"
     @Published var autoSaveTranslations: Bool = true
     @Published var offlineMode: Bool = false
     @Published var cacheSize: String = "12.4 MB"
     
     let availableLanguages = [
         ("en", "English"),
-        ("ja", "Japanese"),
-        ("es", "Spanish"),
-        ("fr", "French"),
-        ("de", "German"),
-        ("zh", "Chinese"),
-        ("ko", "Korean")
+        ("ko", "Korean"),
+        ("vi", "Vietnamese")
     ]
     
     private let apiClient: APIClient
     private let authService: AuthService
     
-    init(apiClient: APIClient = .shared, authService: AuthService = .shared) {
+    nonisolated init(apiClient: APIClient = APIClient.shared, authService: AuthService = AuthService.shared) {
         self.apiClient = apiClient
         self.authService = authService
-        loadPreferences()
+        Task { @MainActor in
+            self.loadPreferences()
+        }
     }
     
     func loadPreferences() {
         // Load from UserDefaults or API
-        defaultLanguage = UserDefaults.standard.string(forKey: "defaultLanguage") ?? "ja"
+        defaultLanguage = UserDefaults.standard.string(forKey: "defaultLanguage") ?? "en"
         autoSaveTranslations = UserDefaults.standard.bool(forKey: "autoSaveTranslations")
     }
     

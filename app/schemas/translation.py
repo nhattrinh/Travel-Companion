@@ -22,6 +22,9 @@ class LiveFrameSegment(BaseModel):
     x2: int
     y2: int
     confidence: float
+    item_type: Optional[str] = "food"  # "food" or "price"
+    price: Optional[str] = None  # Associated price for food items
+    photo_url: Optional[str] = None  # URL for food image
 
 class LiveFrameResponse(BaseModel):
     segments: list[LiveFrameSegment]

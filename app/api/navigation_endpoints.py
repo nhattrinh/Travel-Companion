@@ -1,12 +1,13 @@
 """Navigation endpoints (Phase 4 US2)."""
 from fastapi import APIRouter, Query, HTTPException
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 from app.services.navigation_service import NavigationService
 from app.services.walking_directions_service import (
     get_walking_directions_service,
     WalkingRoute
 )
+from app.services.unsplash_service import get_unsplash_service
 from app.core.metrics_navigation_phrase import record_poi_latency
 
 router = APIRouter(prefix="/navigation", tags=["navigation"])
@@ -30,9 +31,58 @@ class DirectionsResponse(BaseModel):
     error: Optional[str] = None
 
 
+class ImageSearchRequest(BaseModel):
+    """Request model for image search"""
+    query: str
+    max_images: int = 3
+
+
+class ImageSearchResponse(BaseModel):
+    """Response model for image search"""
+    status: str
+    images: List[str] = []
+    error: Optional[str] = None
+
+
 # ============================================================================
 # Endpoints
 # ============================================================================
+
+@router.post("/images", response_model=ImageSearchResponse)
+async def search_location_images(request: ImageSearchRequest):
+    """
+    Search for images of a location or landmark.
+    
+    Args:
+        request: ImageSearchRequest with query and max_images
+        
+    Returns:
+        ImageSearchResponse with list of image URLs
+    """
+    if not request.query:
+        return ImageSearchResponse(
+            status="error",
+            images=[],
+            error="Query is required"
+        )
+    
+    try:
+        service = get_unsplash_service()
+        images = await service.get_location_images(
+            request.query,
+            request.max_images
+        )
+        return ImageSearchResponse(
+            status="ok",
+            images=images,
+            error=None
+        )
+    except Exception as e:
+        return ImageSearchResponse(
+            status="error",
+            images=[],
+            error=str(e)
+        )
 
 @router.post("/directions", response_model=DirectionsResponse)
 async def get_walking_directions(request: DirectionsRequest):

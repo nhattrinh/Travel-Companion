@@ -62,5 +62,9 @@ easyocr>=1.7.0
 # Numerical computing
 numpy>=1.24.0
 
-# OpenAI API for AI-powered features
-openai>=1.0.0
+# Google Gemini API for Vision OCR, translation, and image search
+google-genai>=1.0.0
+
+# Web scraping for Unsplash images
+beautifulsoup4>=4.12.0
+lxml>=5.0.0

@@ -7,26 +7,21 @@ struct MenuView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
     @State private var showingStaticCapture = false
+    @State private var isLoadingImage = false
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                Color.black
+                // Background - matches other pages
+                Color(.systemBackground)
                     .ignoresSafeArea()
                 
-                VStack(spacing: 40) {
-                    Spacer()
-                    
-                    // Title
-                    Text("Menu")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text("Choose how to translate")
+                VStack(alignment: .leading, spacing: 40) {
+                    // Subtitle
+                    Text("Select an option to begin")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
                     
                     Spacer()
                     
@@ -37,9 +32,10 @@ struct MenuView: View {
                             MenuOptionButton(
                                 icon: "photo.on.rectangle",
                                 title: "Camera Roll",
-                                subtitle: "Select a photo to translate"
+                                subtitle: "Select a photo of a menu"
                             )
                         }
+                        .disabled(isLoadingImage)
                         
                         // Live Camera Option
                         Button {
@@ -48,22 +44,52 @@ struct MenuView: View {
                             MenuOptionButton(
                                 icon: "camera.fill",
                                 title: "Live Camera",
-                                subtitle: "Translate in real-time"
+                                subtitle: "Visualize menu in real-time"
                             )
                         }
+                        .disabled(isLoadingImage)
                     }
                     .padding(.horizontal, 30)
                     
                     Spacer()
                     Spacer()
                 }
+                
+                // Loading overlay
+                if isLoadingImage {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    ProgressView("Loading image...")
+                        .padding()
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(12)
+                }
             }
             .onChange(of: selectedPhotoItem) { _, newItem in
+                guard let newItem = newItem else { return }
+                isLoadingImage = true
+                
                 Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        selectedImage = image
-                        showingStaticCapture = true
+                    do {
+                        if let data = try await newItem.loadTransferable(type: Data.self),
+                           let originalImage = UIImage(data: data) {
+                            // Resize image to prevent memory issues
+                            let resizedImage = resizeImageIfNeeded(originalImage, maxDimension: 1920)
+                            await MainActor.run {
+                                selectedImage = resizedImage
+                                isLoadingImage = false
+                                showingStaticCapture = true
+                            }
+                        } else {
+                            await MainActor.run {
+                                isLoadingImage = false
+                            }
+                        }
+                    } catch {
+                        print("Error loading image: \(error)")
+                        await MainActor.run {
+                            isLoadingImage = false
+                        }
                     }
                 }
             }
@@ -79,7 +105,30 @@ struct MenuView: View {
                     }
                 }
             }
+            .navigationTitle("Menu Visualizer")
         }
+    }
+    
+    /// Resize image if it exceeds the maximum dimension to prevent memory issues
+    private func resizeImageIfNeeded(_ image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let size = image.size
+        
+        // Check if resize is needed
+        guard size.width > maxDimension || size.height > maxDimension else {
+            return image
+        }
+        
+        // Calculate new size maintaining aspect ratio
+        let ratio = min(maxDimension / size.width, maxDimension / size.height)
+        let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+        
+        // Create resized image
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resizedImage = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        
+        return resizedImage
     }
 }
 

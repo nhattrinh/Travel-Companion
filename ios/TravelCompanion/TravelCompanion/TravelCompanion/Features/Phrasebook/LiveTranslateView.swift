@@ -24,20 +24,24 @@ struct LiveTranslateView: View {
     let availableLanguages = [
         ("en", "English"),
         ("ko", "Korean"),
-        ("vi", "Vietnamese"),
-        ("ja", "Japanese"),
-        ("zh", "Chinese"),
-        ("es", "Spanish")
+        ("vi", "Vietnamese")
     ]
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Background
-                Color(.systemGroupedBackground)
+                Color(.systemBackground)
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Header subtitle
+                    Text("Tap the button and speak in any supported language")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    
                     // Main content
                     if viewModel.translations.isEmpty && !viewModel.isListening {
                         emptyStateView
@@ -50,28 +54,16 @@ struct LiveTranslateView: View {
                 }
             }
             .navigationTitle("Live Translate")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if !viewModel.translations.isEmpty {
-                        Button("Clear") {
-                            withAnimation {
-                                viewModel.clearTranslations()
-                            }
-                        }
-                    }
+        }
+        .alert("Microphone Permission Required", isPresented: $viewModel.showPermissionAlert) {
+            Button("Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
                 }
             }
-            .alert("Microphone Permission Required", isPresented: $viewModel.showPermissionAlert) {
-                Button("Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Please enable microphone access in Settings to use Live Translate.")
-            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Please enable microphone access in Settings to use Live Translate.")
         }
         .onChange(of: selectedTargetLanguage) { newValue in
             viewModel.targetLanguage = newValue
@@ -130,28 +122,26 @@ struct LiveTranslateView: View {
         VStack(spacing: 24) {
             Spacer()
             
-            Image(systemName: "waveform.circle")
-                .font(.system(size: 80))
-                .foregroundColor(.blue.opacity(0.6))
-            
-            VStack(spacing: 8) {
-                Text("Start Speaking")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Text("Tap the button and speak in any language")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+            // Error message
+            if let error = viewModel.errorMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal)
             }
-            
-            // Language selector moved here
-            languageSelector
-                .padding(.top, 8)
             
             // Centered translate button
             translateButton
                 .padding(.top, 16)
+            
+            // Language selector below button
+            languageSelector
+                .padding(.top, 12)
             
             Spacer()
         }
@@ -199,7 +189,7 @@ struct LiveTranslateView: View {
     
     // MARK: - Controls (for when translations exist)
     private var controlsView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             // Error message
             if let error = viewModel.errorMessage {
                 HStack {
@@ -212,10 +202,21 @@ struct LiveTranslateView: View {
                 .padding(.horizontal)
             }
             
-            // Language selector and button when there are translations
-            languageSelector
-            
+            // Button first, then language selector
             translateButton
+            
+            // Clear button when translations exist
+            if !viewModel.translations.isEmpty {
+                Button("Clear All") {
+                    withAnimation {
+                        viewModel.clearTranslations()
+                    }
+                }
+                .font(.subheadline)
+                .foregroundColor(.red)
+            }
+            
+            languageSelector
         }
         .padding(.vertical, 16)
         .background(Color(.systemBackground))
@@ -267,10 +268,7 @@ struct TranslationCardView: View {
         let names = [
             "en": "English",
             "ko": "Korean",
-            "vi": "Vietnamese",
-            "ja": "Japanese",
-            "zh": "Chinese",
-            "es": "Spanish"
+            "vi": "Vietnamese"
         ]
         return names[code] ?? code.uppercased()
     }

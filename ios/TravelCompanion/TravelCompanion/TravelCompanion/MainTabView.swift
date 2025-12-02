@@ -10,7 +10,7 @@ struct MainTabView: View {
             // Menu (Camera options)
             MenuView()
                 .tabItem {
-                    Label("Menu", systemImage: "square.grid.2x2.fill")
+                    Label("Visualize", systemImage: "square.grid.2x2.fill")
                 }
                 .tag(0)
             
@@ -24,7 +24,7 @@ struct MainTabView: View {
             // Live Translate (Voice)
             LiveTranslateView()
                 .tabItem {
-                    Label("Phrases", systemImage: "waveform.circle.fill")
+                    Label("Translate", systemImage: "waveform.circle.fill")
                 }
                 .tag(2)
             

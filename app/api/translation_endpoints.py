@@ -4,8 +4,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 import time
-from PIL import Image
-from io import BytesIO
+import os
 
 from app.services.ocr_service import OCRService
 from app.services.lang_detect import detect_language
@@ -93,7 +92,7 @@ async def translate_text(request: TextTranslationRequest):
 @router.post("/live-frame")
 async def translate_live_frame(
     image: UploadFile = File(...),
-    target_language: str = "ja",
+    target_language: str = "en",
 ):
     try:
         with record_translation_latency():
@@ -101,24 +100,46 @@ async def translate_live_frame(
         start = time.perf_counter()
         # basic preprocess
         processed = enhance_contrast(raw)
-        ocr_results = await ocr_service.extract_text(processed)
+        
+        # Create OCR service with Gemini Vision for OCR + translation + images
+        from app.services.ocr_service import OCRService, GeminiVisionOCRModel
+        if os.getenv("GOOGLE_API_KEY"):
+            ocr = OCRService(GeminiVisionOCRModel(target_language=target_language))
+        else:
+            ocr = ocr_service
+        
+        ocr_results = await ocr.extract_text(processed)
         source_lang = detect_language(" ".join(r.text for r in ocr_results))
         segments: list[LiveFrameSegment] = []
+        
         for r in ocr_results:
-            tr = await translation_model.translate(
-                r.text,
-                target_language=target_language,
-                source_language=source_lang,
-            )
+            # Use pre-translated text from Gemini Vision if available
+            if r.translated_text and r.translated_text != r.text:
+                translated_text = r.translated_text
+            else:
+                # Fallback to translation model
+                tr = await translation_model.translate(
+                    r.text,
+                    target_language=target_language,
+                    source_language=source_lang,
+                )
+                translated_text = tr["translated_text"]
+            
+            # Use image_url from Gemini response
+            photo_url = r.image_url if r.item_type != "price" else None
+            
             segments.append(
                 LiveFrameSegment(
                     text=r.text,
-                    translated=tr["translated_text"],
+                    translated=translated_text,
                     x1=r.bbox[0],
                     y1=r.bbox[1],
                     x2=r.bbox[2],
                     y2=r.bbox[3],
                     confidence=r.confidence,
+                    item_type=r.item_type or "food",
+                    price=r.price,
+                    photo_url=photo_url,
                 )
             )
         latency_ms = (time.perf_counter() - start) * 1000.0
@@ -139,6 +160,7 @@ async def translate_live_frame(
             )
         return {"status": "ok", "data": data_payload, "error": None}
     except Exception as e:
+        logger.exception("OCR/translation failed")
         # Envelope-style error for OCR/processing failures
         return JSONResponse(
             status_code=400,
