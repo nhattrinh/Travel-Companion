@@ -302,13 +302,20 @@ class ModelLifecycleManager:
         """
         uptime = int((datetime.utcnow() - self._startup_time).total_seconds())
         
+        # Get system health and convert to dict if needed
+        system_health = self.health_monitor.get_system_health()
+        health_dict = {
+            "overall_status": system_health.overall_status,
+            "uptime_seconds": system_health.uptime_seconds,
+            "last_updated": system_health.last_updated.isoformat(),
+        }
+        
         return {
             "uptime_seconds": uptime,
             "startup_time": self._startup_time.isoformat(),
             "model_manager_healthy": self.model_manager.is_healthy(),
             "health_monitoring_active": self.health_monitor._running,
-            "model_statuses": asyncio.create_task(self.model_manager.get_all_model_statuses()),
-            "system_health": self.health_monitor.get_system_health(),
+            "system_health": health_dict,
             "health_summary": self.health_monitor.get_health_summary()
         }
     

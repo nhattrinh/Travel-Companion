@@ -32,7 +32,11 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/openapi.json",
             "/health",
-            "/status"
+            "/status",
+            "/translation/text",
+            "/auth/login",
+            "/auth/register",
+            "/auth/refresh"
         }
     
     def _load_api_keys(self) -> Set[str]:

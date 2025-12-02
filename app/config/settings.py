@@ -3,7 +3,8 @@ Configuration management system using Pydantic Settings.
 Supports environment-based configuration for different deployment environments.
 """
 
-from pydantic import BaseSettings, Field, validator
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings
 from typing import Optional, Dict, Any, List
 from enum import Enum
 import os
@@ -63,7 +64,7 @@ class ConcurrencySettings(BaseSettings):
 class RedisSettings(BaseSettings):
     """Redis cache configuration"""
     
-    host: str = Field(default="localhost")
+    host: str = Field(default="redis")  # Default to docker service name
     port: int = Field(default=6379, ge=1, le=65535)
     password: Optional[str] = Field(default=None)
     db: int = Field(default=0, ge=0, le=15)
@@ -77,8 +78,7 @@ class RedisSettings(BaseSettings):
         auth = f":{self.password}@" if self.password else ""
         return f"redis://{auth}{self.host}:{self.port}/{self.db}"
     
-    class Config:
-        env_prefix = "REDIS_"
+    model_config = {"env_prefix": "REDIS_"}
 
 
 class SecuritySettings(BaseSettings):
@@ -89,25 +89,29 @@ class SecuritySettings(BaseSettings):
     rate_limit_requests_per_minute: int = Field(default=60, ge=1, le=1000)
     cors_origins: List[str] = Field(default_factory=lambda: ["*"])
     cors_allow_credentials: bool = Field(default=True)
-    cors_allow_methods: List[str] = Field(default_factory=lambda: ["GET", "POST"])
+    cors_allow_methods: List[str] = Field(
+        default_factory=lambda: ["GET", "POST"]
+    )
     cors_allow_headers: List[str] = Field(default_factory=lambda: ["*"])
     
-    @validator('api_keys', pre=True)
+    @field_validator('api_keys', mode='before')
+    @classmethod
     def parse_api_keys(cls, v):
         """Parse API keys from environment variable or list"""
         if isinstance(v, str):
             return [key.strip() for key in v.split(",") if key.strip()]
         return v or []
     
-    @validator('cors_origins', pre=True)
+    @field_validator('cors_origins', mode='before')
+    @classmethod
     def parse_cors_origins(cls, v):
         """Parse CORS origins from environment variable or list"""
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
+            origin_list = v.split(",")
+            return [origin.strip() for origin in origin_list if origin.strip()]
         return v or ["*"]
     
-    class Config:
-        env_prefix = "SECURITY_"
+    model_config = {"env_prefix": "SECURITY_"}
 
 
 class FoodImageSettings(BaseSettings):
@@ -120,8 +124,7 @@ class FoodImageSettings(BaseSettings):
     placeholder_image_url: str = Field(default="/static/images/food-placeholder.jpg")
     cache_enabled: bool = Field(default=True)
     
-    class Config:
-        env_prefix = "FOOD_IMAGE_"
+    model_config = {"env_prefix": "FOOD_IMAGE_"}
 
 
 class Settings(BaseSettings):
@@ -133,6 +136,9 @@ class Settings(BaseSettings):
     environment: Environment = Field(default=Environment.DEVELOPMENT)
     debug: bool = Field(default=False)
     
+    # API Key Configuration
+    require_api_key: bool = Field(default=False, description="Whether to require API key for authentication")
+    
     # Server Configuration
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000, ge=1, le=65535)
@@ -141,60 +147,33 @@ class Settings(BaseSettings):
     
     # Logging Configuration
     log_level: LogLevel = Field(default=LogLevel.INFO)
-    log_format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    log_format: str = Field(
+        default="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     log_file: Optional[str] = Field(default=None)
     log_rotation: str = Field(default="1 day")
     log_retention: str = Field(default="30 days")
     
     # Storage Configuration
     temp_storage_path: str = Field(default="temp")
-    max_temp_file_age_hours: int = Field(default=24, ge=1, le=168)  # 1 week max
-    cleanup_interval_minutes: int = Field(default=60, ge=5, le=1440)  # 1 day max
+    max_temp_file_age_hours: int = Field(default=24, ge=1, le=168)
+    cleanup_interval_minutes: int = Field(default=60, ge=5, le=1440)
     
     # Nested Settings
     models: ModelSettings = Field(default_factory=ModelSettings)
-    concurrency: ConcurrencySettings = Field(default_factory=ConcurrencySettings)
+    concurrency: ConcurrencySettings = Field(
+        default_factory=ConcurrencySettings
+    )
     redis: RedisSettings = Field(default_factory=RedisSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     food_images: FoodImageSettings = Field(default_factory=FoodImageSettings)
     
-    @validator('environment', pre=True)
+    @field_validator('environment', mode='before')
+    @classmethod
     def validate_environment(cls, v):
         """Validate and normalize environment setting"""
         if isinstance(v, str):
             return Environment(v.lower())
-        return v
-    
-    @validator('debug')
-    def set_debug_based_on_environment(cls, v, values):
-        """Automatically set debug mode for development environment"""
-        env = values.get('environment', Environment.DEVELOPMENT)
-        if env == Environment.DEVELOPMENT:
-            return True
-        return v
-    
-    @validator('log_level')
-    def set_log_level_based_on_environment(cls, v, values):
-        """Set appropriate log level based on environment"""
-        env = values.get('environment', Environment.DEVELOPMENT)
-        debug = values.get('debug', False)
-        
-        if debug or env == Environment.DEVELOPMENT:
-            return LogLevel.DEBUG
-        elif env == Environment.STAGING:
-            return LogLevel.INFO
-        elif env == Environment.PRODUCTION:
-            return LogLevel.WARNING
-        return v
-    
-    @validator('workers')
-    def set_workers_based_on_environment(cls, v, values):
-        """Set appropriate worker count based on environment"""
-        env = values.get('environment', Environment.DEVELOPMENT)
-        if env == Environment.DEVELOPMENT:
-            return 1
-        elif env == Environment.STAGING:
-            return min(v, 4)
         return v
     
     def get_temp_storage_path(self) -> Path:
@@ -218,24 +197,11 @@ class Settings(BaseSettings):
             "allow_headers": self.security.cors_allow_headers,
         }
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        
-        @classmethod
-        def customise_sources(
-            cls,
-            init_settings,
-            env_settings,
-            file_secret_settings,
-        ):
-            """Customize settings sources priority"""
-            return (
-                init_settings,
-                env_settings,
-                file_secret_settings,
-            )
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+    }
 
 
 # Global settings instance

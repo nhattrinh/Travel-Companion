@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Menu Translation Backend
+# Multi-stage Dockerfile for Menu Translation + Travel Companion Backend
 # Optimized for production deployment with minimal image size
 
 # Stage 1: Build stage
@@ -18,16 +18,20 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
     g++ \
+    tesseract-ocr \
+    libtesseract-dev \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create and set working directory
 WORKDIR /build
 
-# Copy requirements first for better caching
+# Copy base requirements first for caching
 COPY requirements.txt .
+# Copy travel companion extra requirements
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (base + optional travel companion extras)
+RUN pip install -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
@@ -50,10 +54,13 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y \
-    # Image processing libraries
+    # Image processing & OCR libraries
     libjpeg62-turbo \
     libpng16-16 \
     libwebp7 \
+    tesseract-ocr \
+    libtesseract-dev \
+    poppler-utils \
     # Networking and SSL
     ca-certificates \
     curl \
@@ -77,6 +84,7 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Copy application code from builder stage
 COPY --from=builder --chown=appuser:appuser /build/app/ ./app/
+COPY --from=builder --chown=appuser:appuser /build/requirements.txt* ./
 COPY --from=builder --chown=appuser:appuser /build/.env.* ./
 COPY --from=builder --chown=appuser:appuser /build/run.py ./
 
@@ -107,7 +115,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install development Python packages
-RUN pip install --no-cache-dir \
+RUN pip install \
     pytest \
     pytest-asyncio \
     pytest-cov \

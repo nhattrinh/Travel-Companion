@@ -20,17 +20,39 @@
   ============================================================================
 -->
 
-## [Category 1]
+## Code Quality Discipline
 
-- [ ] CHK001 First checklist item with clear action
-- [ ] CHK002 Second checklist item
-- [ ] CHK003 Third checklist item
+- [ ] CHK-CQ-001 Lint & format pass (attach run output)
+- [ ] CHK-CQ-002 >80% coverage for changed modules (list modules below)
+- [ ] CHK-CQ-003 No unused imports / dead code present
+- [ ] CHK-CQ-004 All public functions/classes have docstrings
 
-## [Category 2]
+## User Experience Consistency
 
-- [ ] CHK004 Another category item
-- [ ] CHK005 Item with specific criteria
-- [ ] CHK006 Final item in this category
+- [ ] CHK-UX-001 API response envelope consistent `{status,data,error}`
+- [ ] CHK-UX-002 No breaking field name changes (list deprecations if any)
+- [ ] CHK-UX-003 Error messages actionable & free of internal traces
+- [ ] CHK-UX-004 Translation fallback behavior documented
+
+## Performance & Efficiency
+
+- [ ] CHK-PERF-001 Baseline vs current p95/p99 latency captured
+- [ ] CHK-PERF-002 No >10% regression in p95 for critical endpoints
+- [ ] CHK-PERF-003 Profiling completed for heavy ops (attach summary)
+- [ ] CHK-PERF-004 Cache TTLs & invalidation documented
+
+## Security & Reliability
+
+- [ ] CHK-SEC-001 No secrets committed (scan tool output)
+- [ ] CHK-SEC-002 Input validation implemented for external payloads
+- [ ] CHK-SEC-003 Health checks cover dependencies & queue depth
+- [ ] CHK-SEC-004 Dependencies reviewed for recent security patches
+
+## Workflow & Governance
+
+- [ ] CHK-GOV-001 CI pipeline stages passing (lint/tests/coverage/perf)
+- [ ] CHK-GOV-002 Reviewer sign-off includes principle checklist
+- [ ] CHK-GOV-003 Waivers documented with expiry (if any)
 
 ## Notes
 

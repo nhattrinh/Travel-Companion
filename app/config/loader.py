@@ -1,3 +1,15 @@
+"""Configuration loader & validation utilities (Phase 2)."""
+from app.config.settings import Settings, settings
+from pydantic import ValidationError
+
+def load_settings() -> Settings:
+    return settings
+
+def validate_settings() -> None:
+    try:
+        _ = Settings()  # will raise on invalid env
+    except ValidationError as e:  # pragma: no cover
+        raise RuntimeError(f"Configuration validation failed: {e}")
 """
 Configuration loader utility for environment-specific settings.
 """

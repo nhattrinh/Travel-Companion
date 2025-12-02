@@ -11,6 +11,7 @@ import logging
 import traceback
 import time
 import asyncio
+import json
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -310,9 +311,10 @@ class ErrorHandler:
             timestamp=datetime.utcnow()
         )
         
+        # Use json.loads(error_response.json()) to properly serialize datetime
         return JSONResponse(
             status_code=status_code,
-            content=error_response.dict()
+            content=json.loads(error_response.json())
         )
     
     def _track_error(self, error_code: str) -> None:

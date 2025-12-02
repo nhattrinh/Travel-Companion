@@ -28,3 +28,43 @@ httpx==0.25.2
 black==23.11.0
 flake8==6.1.0
 mypy==1.7.1
+
+# Database
+SQLAlchemy==2.0.23
+alembic==1.12.1
+psycopg2-binary==2.9.9
+
+# Auth
+PyJWT==2.8.0
+bcrypt==4.0.1
+python-dotenv==1.0.0
+pytesseract==0.3.10
+opencv-python-headless==4.8.1.78
+
+# =============================================================================
+# ML/AI Models - Enhanced OCR and Translation (PyTorch 2.x optimized)
+# =============================================================================
+
+# PyTorch with CUDA support (install appropriate version for your system)
+# For CUDA 11.8: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# For CUDA 12.1: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# For CPU only: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Hugging Face Transformers for NLLB, mBART, TrOCR models
+transformers>=4.35.0
+accelerate>=0.24.0  # For efficient model loading and device_map
+
+# EasyOCR for production-ready OCR
+easyocr>=1.7.0
+
+# Numerical computing
+numpy>=1.24.0
+
+# Google Gemini API for Vision OCR, translation, and image search
+google-genai>=1.0.0
+
+# Web scraping for Unsplash images
+beautifulsoup4>=4.12.0
+lxml>=5.0.0

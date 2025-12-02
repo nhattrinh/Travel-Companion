@@ -15,13 +15,7 @@ import uuid
 class SupportedLanguage(str, Enum):
     """Supported languages for translation (Requirements 8.1, 8.2)"""
     ENGLISH = "en"
-    SPANISH = "es"
-    FRENCH = "fr"
-    GERMAN = "de"
-    ITALIAN = "it"
-    PORTUGUESE = "pt"
-    CHINESE = "zh"
-    JAPANESE = "ja"
+    VIETNAMESE = "vn"
     KOREAN = "ko"
 
 
@@ -161,6 +155,11 @@ class StandardErrorResponse(BaseModel):
     details: Optional[Dict[str, Any]] = None
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
     
     @validator('error_code')
     def validate_error_code(cls, v):

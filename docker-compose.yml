@@ -1,38 +1,48 @@
-# Docker Compose configuration for Menu Translation Backend
-# Local development environment
-
-version: '3.8'
+# Docker Compose configuration for Travel Companion Backend
+# Single unified configuration for all environments
 
 services:
-  # Main application service
-  menu-translation-backend:
+  # Main API service with hot-reload support
+  api:
     build:
       context: .
       dockerfile: Dockerfile
-      target: development
-    container_name: menu-translation-backend
+      target: ${BUILD_TARGET:-development}
+    container_name: travel-companion-api
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     environment:
-      - ENVIRONMENT=development
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - POSTGRES_URL=${POSTGRES_URL:-postgresql://user:password@postgres:5432/travel_companion}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_DB=0
-      - DEBUG=true
-      - LOG_LEVEL=DEBUG
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redispass}
+      - REDIS_DB=${REDIS_DB:-0}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      - API_KEYS=${API_KEYS:-dev-api-key}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
     volumes:
-      # Mount source code for hot reload
+      # Mount app directory for hot-reload (changes auto-reload the server)
       - ./app:/app/app
       - ./run.py:/app/run.py
       # Persistent volumes
       - app_logs:/app/logs
       - app_temp:/app/temp
       - app_models:/app/models
+    # Use uvicorn with --reload to watch for file changes in /app/app
+    command: >
+      uvicorn app.main:app 
+      --host 0.0.0.0 
+      --port 8000 
+      --reload 
+      --reload-dir /app/app
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - menu-translation-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -41,38 +51,39 @@ services:
       retries: 3
       start_period: 40s
 
-  # Redis cache service
-  redis:
-    image: redis:7-alpine
-    container_name: menu-translation-redis
-    ports:
-      - "6379:6379"
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: travel-companion-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-travel_companion}
     volumes:
-      - redis_data:/data
-      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    command: redis-server /usr/local/etc/redis/redis.conf
-    networks:
-      - menu-translation-network
+      - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-travel_companion}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
 
-# Named volumes for data persistence
-volumes:
-  redis_data:
-    driver: local
-  app_logs:
-    driver: local
-  app_temp:
-    driver: local
-  app_models:
-    driver: local
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: travel-companion-redis
+    command: ["redis-server", "--appendonly", "no", "--requirepass", "${REDIS_PASSWORD:-redispass}"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
-# Custom network
-networks:
-  menu-translation-network:
-    driver: bridge
+volumes:
+  pgdata:
+  app_logs:
+  app_temp:
+  app_models:
