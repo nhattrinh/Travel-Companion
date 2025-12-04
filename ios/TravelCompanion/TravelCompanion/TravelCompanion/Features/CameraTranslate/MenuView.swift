@@ -32,7 +32,7 @@ struct MenuView: View {
                             MenuOptionButton(
                                 icon: "photo.on.rectangle",
                                 title: "Camera Roll",
-                                subtitle: "Select a photo of a menu"
+                                subtitle: "Select a photo of a menu",
                             )
                         }
                         .disabled(isLoadingImage)
@@ -151,7 +151,7 @@ struct MenuOptionButton: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(.black)
                 
                 Text(subtitle)
                     .font(.caption)

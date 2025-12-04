@@ -5,6 +5,13 @@ struct UserDTO: Codable, Identifiable {
     let email: String
     let preferences: [String: AnyCodable]?
     
+    // Regular initializer for creating UserDTO instances
+    init(id: Int, email: String, preferences: [String: AnyCodable]? = nil) {
+        self.id = id
+        self.email = email
+        self.preferences = preferences
+    }
+    
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(Int.self, forKey: .id)
@@ -16,6 +23,13 @@ struct UserDTO: Codable, Identifiable {
         } else {
             preferences = nil
         }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(email, forKey: .email)
+        try container.encodeIfPresent(preferences, forKey: .preferences)
     }
     
     private enum CodingKeys: String, CodingKey {

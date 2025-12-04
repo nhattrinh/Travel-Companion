@@ -5,7 +5,7 @@ import MapKit
 struct MapView: View {
     @StateObject private var viewModel = NavigationViewModel()
     @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 35.6762, longitude: 139.6503),
+        center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194), // San Francisco
         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
     )
     @FocusState private var isSearchFocused: Bool
@@ -97,7 +97,7 @@ struct MapView: View {
     // MARK: - Search Section
     private var searchSection: some View {
         VStack(spacing: 12) {
-            // Destination search field
+            // Destination search field with location button
             HStack(spacing: 12) {
                 HStack {
                     Image(systemName: "magnifyingglass")
@@ -128,6 +128,18 @@ struct MapView: View {
                 .background(.ultraThinMaterial)
                 .cornerRadius(12)
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                
+                // Current location button
+                Button {
+                    centerOnUser()
+                } label: {
+                    Image(systemName: "location.fill")
+                        .foregroundColor(.white)
+                        .padding(12)
+                        .background(.blue)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                }
             }
             
             // Get Directions button - only show when there's text
@@ -166,18 +178,6 @@ struct MapView: View {
             HStack {
                 Spacer()
                 VStack(spacing: 12) {
-                    // Center on user button
-                    Button {
-                        centerOnUser()
-                    } label: {
-                        Image(systemName: "location.fill")
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(.blue)
-                            .clipShape(Circle())
-                            .shadow(radius: 4)
-                    }
-                    
                     // Clear route button (if route exists)
                     if viewModel.currentRoute != nil {
                         Button {
@@ -219,9 +219,6 @@ struct MapView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.2)
-            Text("Getting walking directions...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
         }
         .padding(24)
         .background(.ultraThinMaterial)

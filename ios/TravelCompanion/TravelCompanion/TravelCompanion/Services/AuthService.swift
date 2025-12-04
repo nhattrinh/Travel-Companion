@@ -81,4 +81,43 @@ final class AuthService {
         // TODO: Add token expiration check and refresh logic
         return token
     }
+    
+    /// Fetch current user profile from backend using access token
+    func fetchCurrentUser() async throws -> UserDTO {
+        guard let token = KeychainTokenStore.shared.accessToken() else {
+            throw AuthError.unauthorized
+        }
+        
+        let url = AppEnvironment.apiBaseURL.appendingPathComponent("/auth/me")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.server("Invalid response")
+        }
+        
+        if httpResponse.statusCode == 401 {
+            throw AuthError.unauthorized
+        }
+        
+        struct UserEnvelope: Decodable {
+            let status: String
+            let data: UserData?
+            let error: String?
+            
+            struct UserData: Decodable {
+                let user: UserDTO
+            }
+        }
+        
+        let envelope = try JSONDecoder().decode(UserEnvelope.self, from: data)
+        guard envelope.status == "ok", let userData = envelope.data else {
+            throw AuthError.server(envelope.error ?? "Failed to fetch user")
+        }
+        
+        return userData.user
+    }
 }

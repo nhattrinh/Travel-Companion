@@ -243,7 +243,7 @@ struct LoginView: View {
                     
                     // Delay auth state change slightly so user sees success message
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        self.authState.login()
+                        self.authState.login(user: u)
                     }
                 }
             } catch let authError as AuthService.AuthError {

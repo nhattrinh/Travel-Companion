@@ -19,9 +19,9 @@ struct TranslationCard: Identifiable, Equatable {
 // MARK: - Live Translate View
 struct LiveTranslateView: View {
     @StateObject private var viewModel = LiveTranslateViewModel()
-    @State private var selectedTargetLanguage = "en"
+    @AppStorage("defaultLanguage") private var defaultLanguage = "en"
     
-    let availableLanguages = [
+    private let supportedLanguages = [
         ("en", "English"),
         ("ko", "Korean"),
         ("vi", "Vietnamese")
@@ -35,13 +35,6 @@ struct LiveTranslateView: View {
                     .ignoresSafeArea()
                 
                 VStack(alignment: .leading, spacing: 0) {
-                    // Header subtitle
-                    Text("Tap the button and speak in any supported language")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                    
                     // Main content
                     if viewModel.translations.isEmpty && !viewModel.isListening {
                         emptyStateView
@@ -65,26 +58,27 @@ struct LiveTranslateView: View {
         } message: {
             Text("Please enable microphone access in Settings to use Live Translate.")
         }
-        .onChange(of: selectedTargetLanguage) { newValue in
-            viewModel.targetLanguage = newValue
-        }
     }
     
-    // MARK: - Language Selector
-    private var languageSelector: some View {
+    // MARK: - Language Picker
+    private var languagePicker: some View {
         HStack {
-            Text("Translate to:")
+            Text("I will speak")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
-            Picker("Language", selection: $selectedTargetLanguage) {
-                ForEach(availableLanguages, id: \.0) { code, name in
+            Picker("", selection: $viewModel.sourceLanguage) {
+                ForEach(supportedLanguages, id: \.0) { code, name in
                     Text(name).tag(code)
                 }
             }
             .pickerStyle(.menu)
             .tint(.blue)
         }
+    }
+    
+    private func languageName(for code: String) -> String {
+        supportedLanguages.first { $0.0 == code }?.1 ?? code
     }
     
     // MARK: - Translate Button
@@ -139,8 +133,8 @@ struct LiveTranslateView: View {
             translateButton
                 .padding(.top, 16)
             
-            // Language selector below button
-            languageSelector
+            // Language picker below button
+            languagePicker
                 .padding(.top, 12)
             
             Spacer()
@@ -202,8 +196,12 @@ struct LiveTranslateView: View {
                 .padding(.horizontal)
             }
             
-            // Button first, then language selector
+            // Button first, then language picker
             translateButton
+            
+            // Language picker
+            languagePicker
+                .padding(.top, 8)
             
             // Clear button when translations exist
             if !viewModel.translations.isEmpty {
@@ -216,7 +214,6 @@ struct LiveTranslateView: View {
                 .foregroundColor(.red)
             }
             
-            languageSelector
         }
         .padding(.vertical, 16)
         .background(Color(.systemBackground))

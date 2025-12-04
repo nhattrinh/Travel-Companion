@@ -49,3 +49,42 @@ async def refresh_token(payload: TokenRefresh):
     access = create_access_token(subject)
     new_refresh = create_refresh_token(subject)
     return _envelope(data={"token": Token(access_token=access, refresh_token=new_refresh)})
+
+
+@router.get("/me", response_model=Envelope)
+async def get_current_user(authorization: str | None = None):
+    """Get current user from JWT token in Authorization header."""
+    if not authorization:
+        raise HTTPException(
+            status_code=401, detail="Missing authorization header"
+        )
+
+    # Extract token from "Bearer <token>"
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=401, detail="Invalid authorization header format"
+        )
+
+    token = parts[1]
+    decoded = decode_token(token, refresh=False)
+    if not decoded:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = decoded.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    with db_session() as session:
+        user = session.execute(
+            select(User).where(User.id == int(user_id))
+        ).scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return _envelope(data={
+            "user": UserRead(
+                id=user.id,
+                email=user.email,
+                preferences=user.preferences
+            )
+        })

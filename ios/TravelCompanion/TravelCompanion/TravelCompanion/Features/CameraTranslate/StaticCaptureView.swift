@@ -38,7 +38,7 @@ struct StaticCaptureView: View {
                     processingOverlay
                 }
             }
-            .navigationTitle("Menu Translation")
+            .navigationTitle("Results")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -83,8 +83,7 @@ struct StaticCaptureView: View {
             }
         }
     }
-    
-    // MARK: - Menu Translation Content
+
     @ViewBuilder
     private func menuTranslationContent(image: UIImage) -> some View {
         ScrollView {
@@ -217,14 +216,6 @@ struct StaticCaptureView: View {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(.white)
-                
-                Text("Translating menu...")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Text("Finding items and translations")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
             }
             .padding(30)
             .background(.ultraThinMaterial)

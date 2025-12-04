@@ -13,10 +13,29 @@ final class LiveTranslateViewModel: ObservableObject {
     @Published var currentTranscription = ""
     @Published var errorMessage: String?
     @Published var showPermissionAlert = false
-    @Published var targetLanguage = "en"
+    @Published var sourceLanguage: String = "en" // Language user will speak in
+    
+    // Target language is read from UserDefaults (set in Settings)
+    var targetLanguage: String {
+        UserDefaults.standard.string(forKey: "defaultLanguage") ?? "en"
+    }
+    
+    // MARK: - Language Support
+    // Map language codes to locales for speech recognition
+    static let languageLocaleMap: [String: Locale] = [
+        "en": Locale(identifier: "en-US"),
+        "ko": Locale(identifier: "ko-KR"),
+        "vi": Locale(identifier: "vi-VN")
+    ]
+    
+    static let languageNames: [String: String] = [
+        "en": "English",
+        "ko": "Korean",
+        "vi": "Vietnamese"
+    ]
     
     // MARK: - Private Properties
-    private let speechRecognizer: SFSpeechRecognizer?
+    private var speechRecognizers: [String: SFSpeechRecognizer] = [:]
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
@@ -27,12 +46,58 @@ final class LiveTranslateViewModel: ObservableObject {
     private var silenceTimer: Timer?
     private let silenceThreshold: TimeInterval = 1.5 // seconds of silence before translating
     
+    // MARK: - Computed Properties
+    var currentRecognizer: SFSpeechRecognizer? {
+        speechRecognizers[sourceLanguage]
+    }
+    
     // MARK: - Initialization
     init(apiClient: APIClient? = nil) {
         self.apiClient = apiClient ?? APIClient.shared
         
-        // Initialize speech recognizer with no specific locale to auto-detect
-        self.speechRecognizer = SFSpeechRecognizer()
+        // Initialize speech recognizers for supported languages
+        for (code, locale) in Self.languageLocaleMap {
+            if let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable {
+                // Enable default task hint for better accuracy
+                if #available(iOS 13.0, *) {
+                    recognizer.defaultTaskHint = .dictation
+                }
+                speechRecognizers[code] = recognizer
+            }
+        }
+    }
+    
+    // MARK: - Contextual Strings for Better Accuracy
+    /// Returns common travel phrases to help speech recognition accuracy
+    private func getContextualStrings() -> [String] {
+        // Common travel phrases in the source language
+        switch sourceLanguage {
+        case "en":
+            return [
+                "hello", "goodbye", "thank you", "please", "excuse me",
+                "where is", "how much", "I need", "can you help",
+                "the bathroom", "the restaurant", "the hotel", "the airport",
+                "I don't understand", "do you speak English",
+                "water", "food", "menu", "check please", "bill",
+                "taxi", "bus", "train", "subway", "station"
+            ]
+        case "ko":
+            return [
+                "안녕하세요", "감사합니다", "죄송합니다", "실례합니다",
+                "얼마예요", "어디예요", "도와주세요", "화장실",
+                "식당", "호텔", "공항", "택시", "버스", "지하철",
+                "물", "음식", "메뉴", "계산서", "영어"
+            ]
+        case "vi":
+            return [
+                "xin chào", "cảm ơn", "xin lỗi", "làm ơn",
+                "bao nhiêu", "ở đâu", "giúp tôi", "nhà vệ sinh",
+                "nhà hàng", "khách sạn", "sân bay", "taxi", "xe buýt",
+                "nước", "thức ăn", "thực đơn", "tính tiền", "tiếng Anh"
+            ]
+        default:
+            return []
+        }
     }
     
     // MARK: - Public Methods
@@ -118,7 +183,14 @@ final class LiveTranslateViewModel: ObservableObject {
         // Configure audio session
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            // Use .playAndRecord to support external audio devices better
+            // .allowBluetooth enables Bluetooth headset microphones
+            // .defaultToSpeaker ensures audio comes from speaker when no headphones
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .measurement,
+                options: [.duckOthers, .allowBluetooth, .defaultToSpeaker]
+            )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             errorMessage = "Failed to configure audio session: \(error.localizedDescription)"
@@ -138,8 +210,24 @@ final class LiveTranslateViewModel: ObservableObject {
             return
         }
         
+        // Configure for better accuracy
         recognitionRequest.shouldReportPartialResults = true
         recognitionRequest.addsPunctuation = true
+        
+        // Use on-device recognition for better accuracy and privacy when available
+        if #available(iOS 13.0, *) {
+            recognitionRequest.requiresOnDeviceRecognition = false // Set to true for offline, but less accurate
+        }
+        
+        // Set task hint for dictation (better for general speech)
+        if #available(iOS 16.0, *) {
+            recognitionRequest.taskHint = .dictation
+        }
+        
+        // Add contextual strings for common travel phrases to improve accuracy
+        if #available(iOS 14.0, *) {
+            recognitionRequest.contextualStrings = getContextualStrings()
+        }
         
         // Get input node - wrap in do-catch to handle hardware unavailable
         let inputNode: AVAudioInputNode
@@ -163,7 +251,7 @@ final class LiveTranslateViewModel: ObservableObject {
         }
         
         // Start recognition task
-        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+        recognitionTask = currentRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -181,14 +269,28 @@ final class LiveTranslateViewModel: ObservableObject {
                 }
                 
                 if let error = error {
-                    // Check if it's just a timeout/no speech error (which is normal)
+                    // Check if it's just a timeout/no speech/cancelled error (which is normal)
                     let nsError = error as NSError
-                    if nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110 {
-                        // No speech detected, restart if still listening
-                        if self.isListening {
+                    
+                    // kAFAssistantErrorDomain errors that are expected and should be ignored:
+                    // 1110 - No speech detected (timeout)
+                    // 216 - Recognition was cancelled (user stopped)
+                    // 209 - Recognition request was invalidated
+                    // 203 - Recognition was cancelled
+                    // 1101 - Retry (temporary failure)
+                    let ignorableErrorCodes = [216, 203, 209, 1101, 1110]
+                    
+                    if nsError.domain == "kAFAssistantErrorDomain" && ignorableErrorCodes.contains(nsError.code) {
+                        // These are expected errors, don't show to user
+                        // If it's a timeout (1110), restart if still listening
+                        if nsError.code == 1110 && self.isListening {
                             self.restartRecognition()
                         }
+                    } else if nsError.domain == "kAFAssistantErrorDomain" {
+                        // Unknown kAFAssistantErrorDomain error - log but don't show unless significant
+                        print("Speech recognition error: \(nsError.code) - \(error.localizedDescription)")
                     } else {
+                        // Other errors should be shown
                         self.errorMessage = "Recognition error: \(error.localizedDescription)"
                     }
                 }

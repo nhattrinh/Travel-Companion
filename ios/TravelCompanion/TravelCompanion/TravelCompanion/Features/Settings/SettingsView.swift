@@ -18,9 +18,9 @@ struct SettingsView: View {
                             .foregroundColor(.blue)
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Travel User")
+                            Text(displayName)
                                 .font(.headline)
-                            Text("user@example.com")
+                            Text(authState.currentUser?.email ?? "Not signed in")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -132,6 +132,17 @@ struct SettingsView: View {
                 Text("This action cannot be undone. All your data will be permanently deleted.")
             }
         }
+    }
+    
+    /// Display name derived from email (part before @)
+    private var displayName: String {
+        guard let email = authState.currentUser?.email else {
+            return "Guest"
+        }
+        // Extract username from email (part before @)
+        let username = email.components(separatedBy: "@").first ?? email
+        // Capitalize first letter
+        return username.prefix(1).uppercased() + username.dropFirst()
     }
 }
 

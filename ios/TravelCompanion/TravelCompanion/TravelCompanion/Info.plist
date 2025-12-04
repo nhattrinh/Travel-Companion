@@ -54,5 +54,9 @@
     <string>Travel Companion needs your location to show nearby points of interest.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Travel Companion needs photo library access to translate images.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Travel Companion needs microphone access to listen and translate your speech in real-time.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Travel Companion uses speech recognition to convert your speech to text for translation.</string>
 </dict>
 </plist>
