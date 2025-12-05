@@ -9,6 +9,8 @@ services:
       dockerfile: Dockerfile
       target: ${BUILD_TARGET:-development}
     container_name: travel-companion-api
+    env_file:
+      - .env
     ports:
       - "${API_PORT:-8000}:8000"
     environment:
@@ -23,6 +25,9 @@ services:
       - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
       - API_KEYS=${API_KEYS:-dev-api-key}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY:-}
+      - UNSPLASH_SECRET_KEY=${UNSPLASH_SECRET_KEY:-}
     volumes:
       # Mount app directory for hot-reload (changes auto-reload the server)
       - ./app:/app/app

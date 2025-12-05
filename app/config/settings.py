@@ -127,6 +127,30 @@ class FoodImageSettings(BaseSettings):
     model_config = {"env_prefix": "FOOD_IMAGE_"}
 
 
+class UnsplashSettings(BaseSettings):
+    """Unsplash API configuration"""
+    
+    access_key: Optional[str] = Field(
+        default=None,
+        description="Unsplash API access key (Client-ID)"
+    )
+    secret_key: Optional[str] = Field(
+        default=None,
+        description="Unsplash API secret key (for OAuth flows)"
+    )
+    api_url: str = Field(default="https://api.unsplash.com")
+    max_images_per_query: int = Field(default=3, ge=1, le=30)
+    timeout_seconds: int = Field(default=10, ge=1, le=60)
+    cache_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+    
+    model_config = {
+        "env_prefix": "UNSPLASH_",
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
+
+
 class Settings(BaseSettings):
     """Main application settings"""
     
@@ -167,6 +191,7 @@ class Settings(BaseSettings):
     redis: RedisSettings = Field(default_factory=RedisSettings)
     security: SecuritySettings = Field(default_factory=SecuritySettings)
     food_images: FoodImageSettings = Field(default_factory=FoodImageSettings)
+    unsplash: UnsplashSettings = Field(default_factory=UnsplashSettings)
     
     @field_validator('environment', mode='before')
     @classmethod
@@ -201,6 +226,7 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
+        "extra": "ignore",
     }
 
 

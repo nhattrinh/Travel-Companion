@@ -1,37 +1,48 @@
 """
-Unsplash Image Service - Scrapes images from Unsplash for landmarks and locations.
+Unsplash Image Service - Fetches images from Unsplash using the official API.
 """
 
 import asyncio
 import logging
 import httpx
-from bs4 import BeautifulSoup
 from typing import List, Optional
-from functools import lru_cache
 import time
+
+from app.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
 # Simple in-memory cache with TTL
 _image_cache: dict = {}
-_cache_ttl = 3600  # 1 hour
 
 
 class UnsplashImageService:
-    """Service for fetching images from Unsplash."""
-    
-    HEADERS = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-    }
+    """Service for fetching images from Unsplash using the official API."""
     
     def __init__(self):
-        self.timeout = 10.0
+        self.settings = get_settings().unsplash
+        self.api_url = self.settings.api_url
+        self.access_key = self.settings.access_key
+        self.secret_key = self.settings.secret_key
+        self.timeout = self.settings.timeout_seconds
+        self.cache_ttl = self.settings.cache_ttl_seconds
+        
+        if self.access_key:
+            logger.info("Unsplash API configured with access key")
+        else:
+            logger.warning(
+                "Unsplash API key not configured. "
+                "Set UNSPLASH_ACCESS_KEY in .env file."
+            )
+    
+    def _get_headers(self) -> dict:
+        """Get headers for Unsplash API requests."""
+        if not self.access_key:
+            return {}
+        return {
+            "Authorization": f"Client-ID {self.access_key}",
+            "Accept-Version": "v1",
+        }
     
     async def search_images(
         self,
@@ -39,7 +50,7 @@ class UnsplashImageService:
         max_images: int = 3
     ) -> List[str]:
         """
-        Search Unsplash for images matching the query.
+        Search Unsplash for images matching the query using the official API.
         
         Args:
             query: Search term (e.g., "Golden Gate Bridge", "fried chicken")
@@ -48,91 +59,68 @@ class UnsplashImageService:
         Returns:
             List of image URLs
         """
+        # Check if API key is configured
+        if not self.access_key:
+            logger.warning(
+                "Unsplash API key not configured. "
+                "Set UNSPLASH_ACCESS_KEY environment variable."
+            )
+            return []
+        
         # Check cache first
         cache_key = f"{query.lower()}:{max_images}"
         if cache_key in _image_cache:
             cached_time, cached_urls = _image_cache[cache_key]
-            if time.time() - cached_time < _cache_ttl:
+            if time.time() - cached_time < self.cache_ttl:
                 logger.debug(f"Cache hit for '{query}'")
                 return cached_urls
         
         try:
-            # Format query for URL
-            q = query.replace(' ', '-').lower()
-            url = f'https://unsplash.com/s/photos/{q}'
+            url = f"{self.api_url}/search/photos"
+            params = {
+                "query": query,
+                "per_page": max_images,
+                "orientation": "landscape",
+            }
             
             logger.info(f"Fetching Unsplash images for: {query}")
             
             async with httpx.AsyncClient(
-                headers=self.HEADERS,
+                headers=self._get_headers(),
                 timeout=self.timeout,
-                follow_redirects=True
             ) as client:
-                response = await client.get(url)
+                response = await client.get(url, params=params)
+                
+                if response.status_code == 401:
+                    logger.error("Unsplash API authentication failed. Check API key.")
+                    return []
+                
+                if response.status_code == 403:
+                    logger.error("Unsplash API rate limit exceeded.")
+                    return []
                 
                 if response.status_code != 200:
                     logger.warning(
-                        f"Unsplash returned {response.status_code} for '{query}'"
+                        f"Unsplash API returned {response.status_code} for '{query}'"
                     )
                     return []
                 
-                soup = BeautifulSoup(response.text, 'lxml')
+                data = response.json()
+                results = data.get("results", [])
                 
+                # Extract regular-sized image URLs
                 image_urls = []
-                
-                # Look for img tags with srcset containing photos
-                imgs = soup.select('img[srcset]')
-                for img in imgs:
-                    srcset = img.get('srcset', '')
-                    
-                    # Skip if no photo in srcset (profile images, etc.)
-                    if '/photo-' not in srcset:
-                        continue
-                    
-                    # Parse srcset to find 400w version
-                    # Format: "https://...?w=100 100w, https://...?w=200 200w, ..."
-                    parts = srcset.split(',')
-                    target_url = None
-                    
-                    for part in parts:
-                        part = part.strip()
-                        if '400w' in part:
-                            # Extract URL (before the space and width)
-                            target_url = part.split()[0] if ' ' in part else part
-                            break
-                    
-                    # Fallback to first URL if no 400w
-                    if not target_url and parts:
-                        first_part = parts[0].strip()
-                        target_url = first_part.split()[0] if ' ' in first_part else first_part
-                    
-                    if target_url and 'images.unsplash.com/photo-' in target_url:
-                        image_urls.append(target_url)
-                    
-                    if len(image_urls) >= max_images * 2:  # Get extras for dedup
-                        break
-                
-                # Deduplicate by photo ID
-                seen = set()
-                unique_urls = []
-                for img_url in image_urls:
-                    # Extract photo ID: photo-XXXXXXXXX
-                    import re
-                    match = re.search(r'photo-([a-zA-Z0-9_-]+)', img_url)
-                    if match:
-                        photo_id = match.group(1)
-                        if photo_id not in seen:
-                            seen.add(photo_id)
-                            unique_urls.append(img_url)
-                
-                image_urls = unique_urls[:max_images]
+                for photo in results:
+                    urls = photo.get("urls", {})
+                    # Prefer 'regular' size (1080px width), fallback to 'small'
+                    img_url = urls.get("regular") or urls.get("small")
+                    if img_url:
+                        image_urls.append(img_url)
                 
                 # Cache the results
                 _image_cache[cache_key] = (time.time(), image_urls)
                 
-                logger.info(
-                    f"Found {len(image_urls)} images for '{query}'"
-                )
+                logger.info(f"Found {len(image_urls)} images for '{query}'")
                 return image_urls
                 
         except httpx.TimeoutException:
@@ -169,6 +157,51 @@ class UnsplashImageService:
                 images = await self.search_images(simplified, max_images)
         
         return images
+    
+    async def get_random_photo(
+        self,
+        query: Optional[str] = None,
+        orientation: str = "landscape"
+    ) -> Optional[str]:
+        """
+        Get a random photo from Unsplash.
+        
+        Args:
+            query: Optional search query to filter random photo
+            orientation: Photo orientation (landscape, portrait, squarish)
+            
+        Returns:
+            Image URL or None
+        """
+        if not self.access_key:
+            logger.warning("Unsplash API key not configured.")
+            return None
+        
+        try:
+            url = f"{self.api_url}/photos/random"
+            params = {"orientation": orientation}
+            if query:
+                params["query"] = query
+            
+            async with httpx.AsyncClient(
+                headers=self._get_headers(),
+                timeout=self.timeout,
+            ) as client:
+                response = await client.get(url, params=params)
+                
+                if response.status_code != 200:
+                    logger.warning(
+                        f"Unsplash random photo returned {response.status_code}"
+                    )
+                    return None
+                
+                data = response.json()
+                urls = data.get("urls", {})
+                return urls.get("regular") or urls.get("small")
+                
+        except Exception as e:
+            logger.error(f"Error fetching random Unsplash photo: {e}")
+            return None
 
 
 # Singleton instance

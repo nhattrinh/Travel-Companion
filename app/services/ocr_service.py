@@ -243,11 +243,11 @@ class OCRService:
     
     def __init__(self, ocr_model: Optional[BaseOCRModel] = None):
         """Initialize OCR service with optional model"""
-        # Use OpenAI Vision model by default if API key is available
+        # Use Gemini Vision model by default if API key is available
         if ocr_model:
             self.ocr_model = ocr_model
-        elif os.getenv("OPENAI_API_KEY"):
-            self.ocr_model = OpenAIVisionOCRModel()
+        elif os.getenv("GOOGLE_API_KEY"):
+            self.ocr_model = GeminiVisionOCRModel()
         else:
             self.ocr_model = MockOCRModel()
         self.image_processor = ImageProcessor()

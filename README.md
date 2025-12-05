@@ -56,7 +56,12 @@ REDIS_URL=redis://localhost:6379/0
 JWT_SECRET=changeme
 LOG_LEVEL=INFO
 DEBUG=true
+
+# Unsplash API (for location images)
+UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 ```
+
+> **Note**: To get an Unsplash API key, register at [unsplash.com/developers](https://unsplash.com/developers) and create an application.
 
 ## Backend Setup
 ```bash

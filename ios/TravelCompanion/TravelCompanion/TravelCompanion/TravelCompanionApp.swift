@@ -12,12 +12,15 @@ import Combine
 struct TravelCompanionApp: App {
     @StateObject private var authState = AuthState()
     @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+    @State private var showWelcome = true
     
     var body: some Scene {
         WindowGroup {
             Group {
                 if showOnboarding {
                     OnboardingView(showOnboarding: $showOnboarding)
+                } else if showWelcome && !authState.isAuthenticated {
+                    WelcomeView(showWelcome: $showWelcome)
                 } else if authState.isAuthenticated {
                     MainTabView()
                         .environmentObject(authState)

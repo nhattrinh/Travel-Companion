@@ -114,16 +114,20 @@ struct LoginView: View {
                     HStack {
                         if loading {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                 .scaleEffect(0.8)
                         }
                         Text(loading ? "Signing in..." : "Login")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(loginButtonDisabled ? Color.blue.opacity(0.5) : Color.blue)
-                    .foregroundColor(.white)
+                    .background(loginButtonDisabled ? Color.white.opacity(0.5) : Color.white)
+                    .foregroundColor(.black)
                     .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
                 }
                 .disabled(loginButtonDisabled)
 
@@ -139,7 +143,7 @@ struct LoginView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(registerButtonDisabled ? Color.green.opacity(0.5) : Color.green)
+                    .background(registerButtonDisabled ? Color.blue.opacity(0.5) : Color.blue)
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }

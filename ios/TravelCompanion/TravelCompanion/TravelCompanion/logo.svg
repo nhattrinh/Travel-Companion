@@ -1,0 +1,24 @@
+<svg width="650" height="150" viewBox="0 0 650 150" xmlns="http://www.w3.org/2000/svg">
+  
+  <g transform="translate(80, 10)">
+      
+      <path d="M120 40 Q120 20 140 20 L180 20 Q200 20 200 40 V70 Q200 90 180 90 H170 V110 L150 90 H140 Q120 90 120 70 Z" 
+            fill="#007AFF"/>
+            
+      <line x1="150" y1="40" x2="150" y2="70" stroke="white" stroke-width="3" stroke-linecap="round"/>
+      <line x1="160" y1="35" x2="160" y2="75" stroke="white" stroke-width="3" stroke-linecap="round"/>
+      <line x1="170" y1="45" x2="170" y2="65" stroke="white" stroke-width="3" stroke-linecap="round"/>
+
+      <path d="M50 40 Q50 20 70 20 L110 20 Q130 20 130 40 V70 Q130 90 110 90 H80 L60 110 V90 H70 Q50 90 50 70 Z" 
+            fill="white" stroke="black" stroke-width="4"/>
+
+      <text x="230" y="65" 
+            font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
+            font-size="36" 
+            font-weight="bold" 
+            fill="black"
+            dominant-baseline="middle">
+        Travel Companion
+      </text>
+  </g>
+</svg>

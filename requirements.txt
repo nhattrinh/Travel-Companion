@@ -39,7 +39,7 @@ PyJWT==2.8.0
 bcrypt==4.0.1
 python-dotenv==1.0.0
 pytesseract==0.3.10
-opencv-python-headless==4.8.1.78
+opencv-python-headless>=4.9.0,<4.11.0
 
 # =============================================================================
 # ML/AI Models - Enhanced OCR and Translation (PyTorch 2.x optimized)
@@ -63,7 +63,7 @@ openai-whisper>=20231117  # Whisper STT model
 easyocr>=1.7.0
 
 # Numerical computing
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 
 # Google Gemini API for Vision OCR, translation, and image search
 google-genai>=1.0.0
