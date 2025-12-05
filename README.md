@@ -1,36 +1,51 @@
 # Travel Companion
 
-FastAPI backend + SwiftUI iOS app delivering live camera translation overlay, context-aware navigation guidance (POIs + etiquette), smart phrase suggestions, favorites, and persistent trip memory. Includes privacy purge, metrics instrumentation, and deprecation utilities.
+FastAPI backend + SwiftUI iOS app delivering menu visualization with OCR translation, AI-powered navigation with walking directions, live speech-to-text translation, and user settings management. Includes onboarding flow, authentication, privacy purge, metrics instrumentation, and batch processing.
 
 ## High-Level Features
 
 | Domain | Key Capabilities |
 |--------|------------------|
-| Translation | Live frame OCR + translation (p95 ≤1.0s), static image fallback, history save |
-| Navigation | Nearby POIs, contextual etiquette hints, caching layer |
-| Phrasebook | Context-based phrase suggestions, favorites toggle, suggestion caching |
-| Trip Memory | Trip lifecycle (start/end), recent translations, favorites continuity, retention purge |
-| Privacy | `/privacy/purge` endpoint + cascade deletion service |
+| Menu Visualization | Camera roll & live camera OCR, menu item extraction, food classification, multilingual translation (EN↔KO↔VI) |
+| Navigation | Interactive map with route overlay, AI-powered walking directions, destination search, offline mode support |
+| Live Translate | Real-time speech-to-text, voice translation cards, source/target language selection, conversation history |
+| Settings | User profile, language preferences, auto-save toggles, cache management, notification settings |
+| Auth & Onboarding | Login/signup flow, onboarding carousel, Keychain token storage, user session management |
+| Privacy | `/privacy/purge` endpoint + cascade deletion service, account deletion |
 | Metrics | Latency timers (translation, POI, phrase), system endpoint metrics, cache stats |
-| Deprecation | Dual field mapping utility for graceful field evolution |
-| iOS Client | Camera overlay, language selector, phrasebook, navigation map, trip overview |
+| Batch Processing | Multi-image menu processing, concurrent OCR with resource management |
 
-## Repository Structure (Backend Extract)
+## Repository Structure
 
 ```
 app/
-├── api/                       # Routers: auth, translation, navigation, phrasebook, trips, privacy, metrics
-├── core/                      # db, security, jwt, logging, metrics, deprecation, validation
+├── api/                       # Routers: auth, menu, batch, translation, navigation, phrasebook, trips, privacy, metrics, health
+├── core/                      # db, security, jwt, logging, metrics, deprecation, validation, processing pipeline
 ├── config/                    # Settings & loader
 ├── middleware/                # Request context, rate limit, auth
-├── models/                    # SQLAlchemy models
+├── models/                    # SQLAlchemy models (User, Trip, Translation, Favorite, Phrase, POI)
 ├── schemas/                   # Pydantic schemas
-├── services/                  # OCR, translation, navigation, phrase suggestions, trip, purge
+├── services/                  # OCR, translation, navigation, phrase suggestions, trip, purge, food image, maps client
 └── ...
 
+models/                        # ML model implementations (used by app/services)
+├── menu_translator/           # PaddleOCR + NLLB-200 + EfficientNet-B4 for menu OCR & translation
+├── nav_llm/                   # Llama 4 Scout navigation LLM for walking directions
+└── translation_stt/           # Whisper speech-to-text for live translation
+
 alembic/versions/              # Migrations
-ios/TravelCompanion/            # SwiftUI app
-specs/001-travel-companion/     # Feature spec, plan, tasks
+
+ios/TravelCompanion/           # SwiftUI iOS app
+├── Features/
+│   ├── Auth/                  # LoginView
+│   ├── CameraTranslate/       # MenuView, CameraView, StaticCaptureView, OverlayRenderer
+│   ├── Navigation/            # MapView, DirectionsDrawer, NavigationViewModel
+│   ├── Phrasebook/            # LiveTranslateView, PhrasebookView, ChatSuggestionView
+│   ├── Onboarding/            # OnboardingView
+│   └── Settings/              # SettingsView
+├── Services/                  # APIClient, AuthService, ImageSearchService, OpenAIDirectionsService
+├── Security/                  # KeychainTokenStore
+└── Shared/                    # Models (DTOs), Config, Utilities
 ```
 
 ## Environment & Configuration
@@ -58,19 +73,46 @@ Docs: `http://localhost:8000/docs`
 docker compose -f docker-compose.travel.yml up --build
 ```
 
-## iOS Setup
-Open `ios/TravelCompanion/` in Xcode (Swift 5.9, iOS 17+). Configure base URL in `Shared/Config/Environment.swift`.
+## iOS App
+
+The iOS client is built with SwiftUI (Swift 5.9, iOS 17+) featuring four main tabs:
+
+| Tab | Feature | Description |
+|-----|---------|-------------|
+| **Visualize** | Menu Translation | Camera roll photo picker or live camera for menu OCR and translation |
+| **Navigate** | Map & Directions | Interactive map with search, AI-powered walking directions, route overlay |
+| **Translate** | Live Speech | Real-time voice translation with conversation cards |
+| **Settings** | Preferences | Language settings, cache management, notifications, account |
+
+Open `ios/TravelCompanion/` in Xcode. Configure base URL in `Shared/Config/Environment.swift`.
 
 ## Key Endpoints (Envelope `{status,data,error}`)
-- `POST /translation/live-frame`
-- `POST /translation/image`
-- `POST /translation/save`
-- `GET /navigation/pois`
-- `GET /phrases` / `POST /phrases/{id}/favorite` / `GET /phrases/favorites`
-- `POST /trips/start` / `POST /trips/{id}/end`
-- `POST /privacy/purge`
-- `GET /metrics`
-- `GET /user/profile` / `PATCH /user/profile/preferences`
+
+**Menu Processing:**
+- `POST /api/v1/process-menu` - Single menu image OCR + translation
+- `POST /api/v1/process-menu-batch` - Batch menu processing
+
+**Translation:**
+- `POST /translation/live-frame` - Live camera frame translation
+- `POST /translation/image` - Static image translation
+- `POST /translation/save` - Save translation history
+
+**Navigation:**
+- `GET /navigation/pois` - Nearby points of interest
+
+**Phrasebook:**
+- `GET /phrases` - Get phrase suggestions
+- `POST /phrases/{id}/favorite` - Toggle favorite
+- `GET /phrases/favorites` - Get favorites
+
+**Trips & User:**
+- `POST /trips/start` / `POST /trips/{id}/end` - Trip lifecycle
+- `GET /user/profile` / `PATCH /user/profile/preferences` - User management
+
+**System:**
+- `POST /privacy/purge` - Delete user data
+- `GET /metrics` - System metrics
+- `GET /health` - Health check
 
 ## Metrics & Instrumentation
 Use timing context managers:
