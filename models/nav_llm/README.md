@@ -1,8 +1,3 @@
-FILE: nav_llm_model_spec.txt
-TITLE: Travel Companion – Context & Location Aware Navigator LLM (Llama 4-Based)
-
----
-
 ## Model Report
 
 ### Overview
@@ -475,3 +470,4 @@ python main.py --evaluate --dataset ./data/travel_eval.json
   - Use STT transcripts as user input (voice-driven navigation).
 - T5: Context retention:
   - Remember user preferences (budget, dietary constraints, walking distance) across turns in a conversation.
+
