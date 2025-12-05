@@ -56,6 +56,9 @@ torchvision>=0.15.0
 transformers>=4.35.0
 accelerate>=0.24.0  # For efficient model loading and device_map
 
+# OpenAI Whisper for Speech-to-Text
+openai-whisper>=20231117  # Whisper STT model
+
 # EasyOCR for production-ready OCR
 easyocr>=1.7.0
 

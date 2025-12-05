@@ -1,0 +1,21 @@
+# Navigation LLM Dependencies
+# ===========================
+
+# Core LLM backend (choose one)
+llama-cpp-python>=0.2.50      # Local inference with GGUF models
+openai>=1.3.0                  # For API-based inference (vLLM, llama.cpp server)
+
+# HTTP client (required for tools)
+httpx>=0.25.0                  # Async HTTP for API calls and map tools
+
+# Data validation
+pydantic>=2.5.0                # Schema validation
+
+# Optional: Evaluation and metrics
+numpy>=1.24.0                  # For metric calculations
+
+# Optional: For fine-tuning / training
+# transformers>=4.35.0
+# datasets>=2.15.0
+# torch>=2.1.0
+# peft>=0.7.0                  # Parameter-efficient fine-tuning (LoRA)
